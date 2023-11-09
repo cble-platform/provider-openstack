@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"os"
 
 	cbleGRPC "github.com/cble-platform/cble-provider-grpc/pkg/cble"
 	commonGRPC "github.com/cble-platform/cble-provider-grpc/pkg/common"
@@ -12,13 +13,24 @@ import (
 )
 
 var (
-	Id      = uuid.NewString() // Generate new ID on every boot up for freshness
 	Name    = "provider-openstack"
 	Version = "v1.0"
 )
 
 func main() {
-	logrus.SetLevel(logrus.DebugLevel)
+	// TODO: Add CLI flags to allow non-default CBLE connect (e.g. TLS)
+
+	// Check if the ID is passed in via command line
+	if len(os.Args) < 2 {
+		logrus.Errorf("no ID passed to provider")
+		os.Exit(1)
+	}
+	id := os.Args[1]
+	// Check the arg is a valid UUID (assume this is coming from ENT)
+	if _, err := uuid.Parse(id); err != nil {
+		logrus.Errorf("ID is not a valid UUID")
+		os.Exit(2)
+	}
 
 	// Connect to the CBLE Provider gRPC Server
 	conn, err := cbleGRPC.DefaultConnect()
@@ -37,7 +49,7 @@ func main() {
 
 	// Register this provider instance with the CBLE server
 	registerReply, err := client.RegisterProvider(ctx, &cbleGRPC.RegistrationRequest{
-		Id:      Id,
+		Id:      id,
 		Name:    Name,
 		Version: Version,
 		Features: map[string]bool{
@@ -56,7 +68,7 @@ func main() {
 	defer func() {
 		// Time to shutdown
 		unregisterReply, err := client.UnregisterProvider(ctx, &cbleGRPC.UnregistrationRequest{
-			Id:      Id,
+			Id:      id,
 			Name:    Name,
 			Version: Version,
 		})
