@@ -48,7 +48,7 @@ func main() {
 	if err != nil || registerReply.Status == commonGRPC.RPCStatus_FAILURE {
 		logrus.Fatalf("registration failed: %v", err)
 	} else if registerReply.Status == commonGRPC.RPCStatus_SUCCESS {
-		logrus.Printf("Registration success! Starting provider server on port %d", registerReply.Port)
+		logrus.Printf("Registration success! Starting provider server on socket /tmp/cble-provider-grpc-%s", registerReply.SocketId)
 	} else {
 		logrus.Fatalf("unknown error occurred: %v", err)
 	}
@@ -73,7 +73,7 @@ func main() {
 		TLS:      false,
 		CertFile: "",
 		KeyFile:  "",
-		Port:     int(registerReply.Port),
+		SocketID: registerReply.SocketId,
 	}
 
 	// Serve the provider gRPC server
