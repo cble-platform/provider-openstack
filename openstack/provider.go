@@ -9,10 +9,10 @@ type ProviderOpenstack struct {
 }
 
 const (
-	name        = "Openstack"
+	name        = "provider-openstack"
 	description = "Builder that interfaces with Openstack"
 	author      = "Bradley Harker <github.com/BradHacker>"
-	version     = "1.0"
+	version     = "v0.1.2"
 )
 
 var CONFIG *ProviderOpenstackConfig
