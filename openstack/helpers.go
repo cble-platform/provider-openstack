@@ -24,11 +24,15 @@ func (provider ProviderOpenstack) newAuthClient() (*gophercloud.ProviderClient, 
 	return openstack.AuthenticatedClient(authOpts)
 }
 
-func marshalSyncMap(m *sync.Map) (*structpb.Struct, error) {
+func marshalSyncMap(src *sync.Map) (*structpb.Struct, error) {
 	// Fill a regular Go map with sync.Map values
 	regMap := make(map[string]interface{})
-	m.Range(func(key, value any) bool {
-		regMap[key.(string)] = value
+	src.Range(func(key, value any) bool {
+		keyVal, ok := key.(string)
+		if !ok {
+			return false
+		}
+		regMap[keyVal] = value
 		return true
 	})
 	// Convert to structpb.Struct
