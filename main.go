@@ -12,11 +12,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var (
-	Name    = "provider-openstack"
-	Version = "v1.0"
-)
-
 func main() {
 	// TODO: Add CLI flags to allow non-default CBLE connect (e.g. TLS)
 
@@ -24,6 +19,11 @@ func main() {
 	if len(os.Args) < 2 {
 		logrus.Errorf("no ID passed to provider")
 		os.Exit(1)
+	} else if len(os.Args) >= 3 {
+		// Check for debug value
+		if os.Args[2] == "DEBUG" {
+			logrus.SetLevel(logrus.DebugLevel)
+		}
 	}
 	id := os.Args[1]
 	// Check the arg is a valid UUID (assume this is coming from ENT)
@@ -39,6 +39,9 @@ func main() {
 	}
 	defer conn.Close()
 
+	// Create the Openstack provider
+	provider := openstack.ProviderOpenstack{}
+
 	ctx := context.Background()
 
 	// Create a CBLE Provider gRPC Server client
@@ -50,8 +53,8 @@ func main() {
 	// Register this provider instance with the CBLE server
 	registerReply, err := client.RegisterProvider(ctx, &cbleGRPC.RegistrationRequest{
 		Id:      id,
-		Name:    Name,
-		Version: Version,
+		Name:    provider.Name(),
+		Version: provider.Version(),
 		Features: map[string]bool{
 			providerGRPC.ProviderFeature_DEPLOY:  true,
 			providerGRPC.ProviderFeature_DESTROY: true,
@@ -69,8 +72,8 @@ func main() {
 		// Time to shutdown
 		unregisterReply, err := client.UnregisterProvider(ctx, &cbleGRPC.UnregistrationRequest{
 			Id:      id,
-			Name:    Name,
-			Version: Version,
+			Name:    provider.Name(),
+			Version: provider.Version(),
 		})
 		if err != nil || unregisterReply.Status == commonGRPC.RPCStatus_FAILURE {
 			logrus.Fatalf("unregistration failed: %v", err)
@@ -88,8 +91,10 @@ func main() {
 		SocketID: registerReply.SocketId,
 	}
 
+	logrus.Debugf("serving gRPC with socket ID %s", registerReply.SocketId)
+
 	// Serve the provider gRPC server
-	if err := providerGRPC.Serve(openstack.ProviderOpenstack{}, providerOpts); err != nil {
+	if err := providerGRPC.Serve(provider, providerOpts); err != nil {
 		logrus.Fatalf("failed to server provider gRPC server: %v", err)
 	}
 }
