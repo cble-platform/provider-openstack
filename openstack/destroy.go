@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cble-platform/cble-backend/providers"
 	commonGRPC "github.com/cble-platform/cble-provider-grpc/pkg/common"
 	providerGRPC "github.com/cble-platform/cble-provider-grpc/pkg/provider"
 	"github.com/gophercloud/gophercloud"
@@ -102,12 +101,12 @@ func (provider *ProviderOpenstack) destroyNetwork(ctx context.Context, authClien
 	// Get the network from blueprint
 	_, exist := blueprint.Networks[networkKey]
 	if !exist {
-		stateMap.Store(networkKey, providers.DeployFAILED)
+		stateMap.Store(networkKey, commonGRPC.DeployStateFAILED)
 		return fmt.Errorf("network \"%s\" is not defined", networkKey)
 	}
 
 	// Set network as in progress for dependencies
-	stateMap.Store(networkKey, providers.DeployINPROGRESS)
+	stateMap.Store(networkKey, commonGRPC.DeployStateINPROGRESS)
 
 	// Generate the Network V2 client
 	endpointOpts := gophercloud.EndpointOpts{
@@ -116,7 +115,7 @@ func (provider *ProviderOpenstack) destroyNetwork(ctx context.Context, authClien
 	}
 	networkClient, err := openstack.NewNetworkV2(authClient, endpointOpts)
 	if err != nil {
-		stateMap.Store(networkKey, providers.DeployFAILED)
+		stateMap.Store(networkKey, commonGRPC.DeployStateFAILED)
 		return fmt.Errorf("failed to create openstack network client: %v", err)
 	}
 
@@ -125,7 +124,7 @@ func (provider *ProviderOpenstack) destroyNetwork(ctx context.Context, authClien
 	if exists {
 		err = subnets.Delete(networkClient, osSubnetId.(string)).ExtractErr()
 		if err != nil {
-			stateMap.Store(networkKey, providers.DeployFAILED)
+			stateMap.Store(networkKey, commonGRPC.DeployStateFAILED)
 			return fmt.Errorf("failed to delete subnet: %v", err)
 		}
 		// Wait for the subnet to be deleted
@@ -143,7 +142,7 @@ func (provider *ProviderOpenstack) destroyNetwork(ctx context.Context, authClien
 		// Remove from vars
 		varMap.Delete(networkKey + "_subnet_id")
 	} else {
-		stateMap.Store(networkKey, providers.DeployFAILED)
+		stateMap.Store(networkKey, commonGRPC.DeployStateFAILED)
 		return fmt.Errorf("failed to retrieve subnet id")
 	}
 
@@ -169,7 +168,7 @@ func (provider *ProviderOpenstack) destroyNetwork(ctx context.Context, authClien
 		// Remove from vars
 		varMap.Delete(networkKey + "_id")
 	} else {
-		stateMap.Store(networkKey, providers.DeployFAILED)
+		stateMap.Store(networkKey, commonGRPC.DeployStateFAILED)
 		return fmt.Errorf("failed to retrieve network id")
 	}
 
@@ -182,12 +181,12 @@ func (provider *ProviderOpenstack) destroyRouter(ctx context.Context, authClient
 	// Get the router from blueprint
 	router, exist := blueprint.Routers[routerKey]
 	if !exist {
-		stateMap.Store(routerKey, providers.DeployFAILED)
+		stateMap.Store(routerKey, commonGRPC.DeployStateFAILED)
 		return fmt.Errorf("router \"%s\" is not defined", routerKey)
 	}
 
 	// Set router as in progress for dependencies
-	stateMap.Store(routerKey, providers.DeployINPROGRESS)
+	stateMap.Store(routerKey, commonGRPC.DeployStateINPROGRESS)
 
 	// Generate the Network V2 client
 	endpointOpts := gophercloud.EndpointOpts{
@@ -196,7 +195,7 @@ func (provider *ProviderOpenstack) destroyRouter(ctx context.Context, authClient
 	}
 	networkClient, err := openstack.NewNetworkV2(authClient, endpointOpts)
 	if err != nil {
-		stateMap.Store(routerKey, providers.DeployFAILED)
+		stateMap.Store(routerKey, commonGRPC.DeployStateFAILED)
 		return fmt.Errorf("failed to create openstack network client: %v", err)
 	}
 
@@ -210,7 +209,7 @@ func (provider *ProviderOpenstack) destroyRouter(ctx context.Context, authClient
 					PortID: osPortId.(string),
 				}).Extract()
 				if err != nil {
-					stateMap.Store(routerKey, providers.DeployFAILED)
+					stateMap.Store(routerKey, commonGRPC.DeployStateFAILED)
 					return fmt.Errorf("failed to delete router interface: %v", err)
 				}
 				// Wait for the router port to be deleted
@@ -227,7 +226,7 @@ func (provider *ProviderOpenstack) destroyRouter(ctx context.Context, authClient
 				// Remove from vars
 				varMap.Delete(routerKey + "_" + k + "_port_id")
 				if err != nil {
-					stateMap.Store(routerKey, providers.DeployFAILED)
+					stateMap.Store(routerKey, commonGRPC.DeployStateFAILED)
 					return fmt.Errorf("failed to update deployment vars: %v", err)
 				}
 			}
@@ -236,7 +235,7 @@ func (provider *ProviderOpenstack) destroyRouter(ctx context.Context, authClient
 		// Delete Openstack router
 		err = routers.Delete(networkClient, osRouterId.(string)).ExtractErr()
 		if err != nil {
-			stateMap.Store(routerKey, providers.DeployFAILED)
+			stateMap.Store(routerKey, commonGRPC.DeployStateFAILED)
 			return fmt.Errorf("failed to delete router: %v", err)
 		}
 		// Wait for the router to be deleted
@@ -254,16 +253,16 @@ func (provider *ProviderOpenstack) destroyRouter(ctx context.Context, authClient
 		// Remove from vars
 		varMap.Delete(routerKey + "_id")
 		if err != nil {
-			stateMap.Store(routerKey, providers.DeployFAILED)
+			stateMap.Store(routerKey, commonGRPC.DeployStateFAILED)
 			return fmt.Errorf("failed to update deployment vars: %v", err)
 		}
 	} else {
-		stateMap.Store(routerKey, providers.DeployFAILED)
+		stateMap.Store(routerKey, commonGRPC.DeployStateFAILED)
 		return fmt.Errorf("failed to retrieve router id")
 	}
 
 	// Set router as destroyed for dependencies
-	stateMap.Store(routerKey, providers.DeployDESTROYED)
+	stateMap.Store(routerKey, commonGRPC.DeployStateDESTROYED)
 
 	logrus.Debugf("Successfully destroyed router %s", routerKey)
 	return nil
@@ -274,12 +273,12 @@ func (provider *ProviderOpenstack) destroyHost(ctx context.Context, authClient *
 	// Get the host from blueprint
 	_, exist := blueprint.Hosts[hostKey]
 	if !exist {
-		stateMap.Store(hostKey, providers.DeployFAILED)
+		stateMap.Store(hostKey, commonGRPC.DeployStateFAILED)
 		return fmt.Errorf("host \"%s\" is not defined", hostKey)
 	}
 
 	// Set host as in progress for dependencies
-	stateMap.Store(hostKey, providers.DeployINPROGRESS)
+	stateMap.Store(hostKey, commonGRPC.DeployStateINPROGRESS)
 
 	// Generate the Compute V2 client
 	endpointOpts := gophercloud.EndpointOpts{
@@ -287,7 +286,7 @@ func (provider *ProviderOpenstack) destroyHost(ctx context.Context, authClient *
 	}
 	computeClient, err := openstack.NewComputeV2(authClient, endpointOpts)
 	if err != nil {
-		stateMap.Store(hostKey, providers.DeployFAILED)
+		stateMap.Store(hostKey, commonGRPC.DeployStateFAILED)
 		return fmt.Errorf("failed to create compute v2 client: %v", err)
 	}
 
@@ -296,7 +295,7 @@ func (provider *ProviderOpenstack) destroyHost(ctx context.Context, authClient *
 	if exists {
 		err = servers.Delete(computeClient, osServerId.(string)).ExtractErr()
 		if err != nil {
-			stateMap.Store(hostKey, providers.DeployFAILED)
+			stateMap.Store(hostKey, commonGRPC.DeployStateFAILED)
 			return fmt.Errorf("failed to delete server: %v", err)
 		}
 		// Wait for the server to be deleted
@@ -317,12 +316,12 @@ func (provider *ProviderOpenstack) destroyHost(ctx context.Context, authClient *
 			return fmt.Errorf("failed to update deployment vars: %v", err)
 		}
 	} else {
-		stateMap.Store(hostKey, providers.DeployFAILED)
+		stateMap.Store(hostKey, commonGRPC.DeployStateFAILED)
 		return fmt.Errorf("failed to retrieve server id")
 	}
 
 	// Set host as destroyed for dependencies
-	stateMap.Store(hostKey, providers.DeployDESTROYED)
+	stateMap.Store(hostKey, commonGRPC.DeployStateDESTROYED)
 
 	logrus.Debugf("Successfully destroyed host %s", hostKey)
 	return nil
@@ -336,10 +335,10 @@ func awaitRequiredBy(blueprint *OpenstackBlueprint, stateMap *sync.Map, key stri
 		for _, requiredByKey := range blueprint.Objects[key].RequiredBy {
 			dependentDeploymentValue, exists := stateMap.Load(requiredByKey)
 			if exists {
-				dependentDeploymentState := dependentDeploymentValue.(providers.DeploymentState)
-				if dependentDeploymentState == providers.DeployFAILED {
+				dependentDeploymentState := dependentDeploymentValue.(string)
+				if dependentDeploymentState == commonGRPC.DeployStateFAILED {
 					return fmt.Errorf("\"%s\" dependent \"%s\" failed", key, requiredByKey)
-				} else if dependentDeploymentState == providers.DeployDESTROYED {
+				} else if dependentDeploymentState == commonGRPC.DeployStateDESTROYED {
 					// Dependent is destroyed so we're good
 					continue
 				} else {
