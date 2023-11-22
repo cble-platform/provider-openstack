@@ -137,7 +137,7 @@ func (provider *ProviderOpenstack) deployNetwork(ctx context.Context, authClient
 		networkName = *network.Name
 	}
 	// Prepend the first 8 bytes of deployment ID
-	networkName = deploymentId[:8] + networkName
+	networkName = deploymentId[:8] + "-" + networkName
 
 	// Create the network
 	deployedNetwork, err := networks.Create(networkClient, networks.CreateOpts{
@@ -247,7 +247,7 @@ func (provider *ProviderOpenstack) deployRouter(ctx context.Context, authClient 
 	}
 
 	// Prepend the first 8 bytes of deployment ID
-	routerName := deploymentId[:8] + routerKey
+	routerName := deploymentId[:8] + "-" + routerKey
 
 	routerConfig := routers.CreateOpts{
 		Name:         routerName,
@@ -406,7 +406,7 @@ func (provider *ProviderOpenstack) deployHost(ctx context.Context, authClient *g
 		instanceName = *host.Name
 	}
 	// Prepend the first 8 bytes of deployment ID
-	instanceName = deploymentId[:8] + instanceName
+	instanceName = deploymentId[:8] + "-" + instanceName
 
 	// Configure the volume to clone from the image
 	blockOps := []bootfromvolume.BlockDevice{
