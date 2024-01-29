@@ -55,9 +55,10 @@ func main() {
 		Id:      id,
 		Name:    provider.Name(),
 		Version: provider.Version(),
-		Features: map[string]bool{
-			providerGRPC.ProviderFeature_DEPLOY:  true,
-			providerGRPC.ProviderFeature_DESTROY: true,
+		Features: &cbleGRPC.ProviderFeatures{
+			Deploy:  true,
+			Destroy: true,
+			Console: true,
 		},
 	})
 	if err != nil || registerReply.Status == commonGRPC.RPCStatus_FAILURE {

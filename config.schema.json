@@ -1,0 +1,55 @@
+{
+  "$id": "https://github.com/cble-platform/provider-openstack/blob/main/config.schema.json",
+  "required": [
+    "auth_url",
+    "username",
+    "password",
+    "project_id",
+    "project_name",
+    "domain_name",
+    "domain_id",
+    "console_type",
+    "console_protocol"
+  ],
+  "properties": {
+    "auth_url": {
+      "type": "string",
+      "title": "The API URL of the OpenStack auth service",
+      "examples": ["https://openstack.example.com:5000/v3"]
+    },
+    "username": {
+      "type": "string",
+      "title": "Username used to authenticate to OpenStack"
+    },
+    "password": {
+      "type": "string",
+      "title": "Password used to authenticate to OpenStack"
+    },
+    "project_id": {
+      "type": "string",
+      "title": "The ID of the project to connect to"
+    },
+    "project_name": {
+      "type": "string",
+      "title": "The name of the project to connect to"
+    },
+    "domain_name": {
+      "type": "string",
+      "title": "The name of the domain to connect to (usually 'Default')"
+    },
+    "domain_id": {
+      "type": "string",
+      "title": "The id of the domain to connect to (usually 'default')"
+    },
+    "console_type": {
+      "type": "string",
+      "enum": ["novnc", "xvpvnc", "rdp-html5", "spice-html5", "serial", "webmks"],
+      "title": "The name of the domain to connect to (usually 'Default')"
+    },
+    "console_protocol": {
+      "type": "string",
+      "enum": ["vnc", "spice", "rdp", "serial", "mks"],
+      "title": "The name of the domain to connect to (usually 'Default')"
+    }
+  }
+}
