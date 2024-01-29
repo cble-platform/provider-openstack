@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/cble-platform/cble-backend v0.0.0-20231110234319-25d6256f3be8
-	github.com/cble-platform/cble-provider-grpc v0.1.2
+	github.com/cble-platform/cble-provider-grpc v0.1.3
 	github.com/google/uuid v1.4.0
 	github.com/gophercloud/gophercloud v1.7.0
 	github.com/sirupsen/logrus v1.9.3
