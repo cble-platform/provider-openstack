@@ -66,6 +66,8 @@ func (provider ProviderOpenstack) GetConsole(ctx context.Context, request *provi
 	if err != nil {
 		return GetConsoleErrorf(request, "failed to create compute v2 client: %v", err), nil
 	}
+	// Set the microversion of the compute api (min for remote consoles is 2.6)
+	computeClient.Microversion = "2.6"
 
 	// Create the remote console and return the URL
 	remoteConsole, err := remoteconsoles.Create(computeClient, instanceIdStr, remoteconsoles.CreateOpts{
