@@ -25,7 +25,7 @@ func GetConsoleErrorf(request *providerGRPC.GetConsoleRequest, format string, a 
 }
 
 func (provider ProviderOpenstack) GetConsole(ctx context.Context, request *providerGRPC.GetConsoleRequest) (*providerGRPC.GetConsoleReply, error) {
-	logrus.Debugf("Deploy called for deployment \"%s\"", request.DeploymentId)
+	logrus.Debugf("GetConsole called for deployment \"%s\" host \"%s\"", request.DeploymentId, request.HostKey)
 
 	// Check if the provider has been configured
 	if CONFIG == nil {

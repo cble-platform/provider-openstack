@@ -62,7 +62,6 @@ func (provider ProviderOpenstack) Deploy(ctx context.Context, request *providerG
 		DeploymentId: request.DeploymentId,
 		Status:       commonGRPC.RPCStatus_SUCCESS,
 		Errors:       []string{},
-		Resources:    []*providerGRPC.DeployResource{},
 	}
 
 	objectsWg := sync.WaitGroup{}
@@ -77,17 +76,6 @@ func (provider ProviderOpenstack) Deploy(ctx context.Context, request *providerG
 				switch blueprint.Objects[key].Resource {
 				// HOST
 				case OpenstackResourceTypeHost:
-					// Add host to resource list
-					name := blueprint.Hosts[key].Hostname
-					if blueprint.Hosts[key].Name != nil {
-						name = *blueprint.Hosts[key].Name
-					}
-					response.Resources = append(response.Resources, &providerGRPC.DeployResource{
-						DeploymentId: request.DeploymentId,
-						Key:          key,
-						Name:         name,
-						Type:         providerGRPC.ResourceType_HOST,
-					})
 					// Deploy host
 					if err := provider.deployHost(ctx, authClient, request.DeploymentId, &varMap, &stateMap, blueprint, key); err != nil {
 						response.Status = commonGRPC.RPCStatus_FAILURE
@@ -95,17 +83,6 @@ func (provider ProviderOpenstack) Deploy(ctx context.Context, request *providerG
 					}
 				// NETWORK
 				case OpenstackResourceTypeNetwork:
-					// Add network to resource list
-					name := key
-					if blueprint.Networks[key].Name != nil {
-						name = *blueprint.Networks[key].Name
-					}
-					response.Resources = append(response.Resources, &providerGRPC.DeployResource{
-						DeploymentId: request.DeploymentId,
-						Key:          key,
-						Name:         name,
-						Type:         providerGRPC.ResourceType_NETWORK,
-					})
 					// Deploy network
 					if err := provider.deployNetwork(ctx, authClient, request.DeploymentId, &varMap, &stateMap, blueprint, key); err != nil {
 						response.Status = commonGRPC.RPCStatus_FAILURE
@@ -113,17 +90,6 @@ func (provider ProviderOpenstack) Deploy(ctx context.Context, request *providerG
 					}
 				// ROUTER
 				case OpenstackResourceTypeRouter:
-					// Add router to resource list
-					name := key
-					if blueprint.Routers[key].Name != nil {
-						name = *blueprint.Routers[key].Name
-					}
-					response.Resources = append(response.Resources, &providerGRPC.DeployResource{
-						DeploymentId: request.DeploymentId,
-						Key:          key,
-						Name:         name,
-						Type:         providerGRPC.ResourceType_ROUTER,
-					})
 					// Deploy router
 					if err := provider.deployRouter(ctx, authClient, request.DeploymentId, &varMap, &stateMap, blueprint, key); err != nil {
 						response.Status = commonGRPC.RPCStatus_FAILURE
