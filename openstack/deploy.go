@@ -61,6 +61,7 @@ func (provider ProviderOpenstack) Deploy(ctx context.Context, request *providerG
 	response := providerGRPC.DeployReply{
 		DeploymentId: request.DeploymentId,
 		Status:       commonGRPC.RPCStatus_SUCCESS,
+		Errors:       []string{},
 	}
 
 	objectsWg := sync.WaitGroup{}
@@ -73,17 +74,23 @@ func (provider ProviderOpenstack) Deploy(ctx context.Context, request *providerG
 				logrus.Errorf("failed to deploy network: %v", err)
 			} else {
 				switch blueprint.Objects[key].Resource {
+				// HOST
 				case OpenstackResourceTypeHost:
+					// Deploy host
 					if err := provider.deployHost(ctx, authClient, request.DeploymentId, &varMap, &stateMap, blueprint, key); err != nil {
 						response.Status = commonGRPC.RPCStatus_FAILURE
 						response.Errors = append(response.Errors, fmt.Sprintf("failed to deploy host \"%s\": %v", key, err))
 					}
+				// NETWORK
 				case OpenstackResourceTypeNetwork:
+					// Deploy network
 					if err := provider.deployNetwork(ctx, authClient, request.DeploymentId, &varMap, &stateMap, blueprint, key); err != nil {
 						response.Status = commonGRPC.RPCStatus_FAILURE
 						response.Errors = append(response.Errors, fmt.Sprintf("failed to deploy host \"%s\": %v", key, err))
 					}
+				// ROUTER
 				case OpenstackResourceTypeRouter:
+					// Deploy router
 					if err := provider.deployRouter(ctx, authClient, request.DeploymentId, &varMap, &stateMap, blueprint, key); err != nil {
 						response.Status = commonGRPC.RPCStatus_FAILURE
 						response.Errors = append(response.Errors, fmt.Sprintf("failed to deploy host \"%s\": %v", key, err))

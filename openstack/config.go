@@ -6,19 +6,22 @@ import (
 
 	commonGRPC "github.com/cble-platform/cble-provider-grpc/pkg/common"
 	providerGRPC "github.com/cble-platform/cble-provider-grpc/pkg/provider"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/remoteconsoles"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
 
 type ProviderOpenstackConfig struct {
-	AuthUrl     string `yaml:"auth_url"`
-	Username    string `yaml:"username"`
-	Password    string `yaml:"password"`
-	ProjectID   string `yaml:"project_id"`
-	ProjectName string `yaml:"project_name"`
-	RegionName  string `yaml:"region_name"`
-	DomainName  string `yaml:"domain_name,omitempty"`
-	DomainId    string `yaml:"domain_id,omitempty"`
+	AuthUrl                  string                         `yaml:"auth_url"`
+	Username                 string                         `yaml:"username"`
+	Password                 string                         `yaml:"password"`
+	ProjectID                string                         `yaml:"project_id"`
+	ProjectName              string                         `yaml:"project_name"`
+	RegionName               string                         `yaml:"region_name"`
+	DomainName               string                         `yaml:"domain_name,omitempty"`
+	DomainId                 string                         `yaml:"domain_id,omitempty"`
+	PreferredConsoleType     remoteconsoles.ConsoleType     `yaml:"console_type,omitempty"`
+	PreferredConsoleProtocol remoteconsoles.ConsoleProtocol `yaml:"console_protocol,omitempty"`
 }
 
 func ConfigFromBytes(in []byte) (*ProviderOpenstackConfig, error) {
