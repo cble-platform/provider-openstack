@@ -1,6 +1,8 @@
 package openstack
 
 import (
+	"fmt"
+
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 )
@@ -21,21 +23,7 @@ func (provider ProviderOpenstack) newAuthClient() (*gophercloud.ProviderClient, 
 	return openstack.AuthenticatedClient(authOpts)
 }
 
-func ErrorString(s string) *string {
-	return &s
+func Errorf(format string, a ...any) *string {
+	err := fmt.Errorf(format, a...).Error()
+	return &err
 }
-
-// func marshalSyncMap(src *sync.Map) (*structpb.Struct, error) {
-// 	// Fill a regular Go map with sync.Map values
-// 	regMap := make(map[string]interface{})
-// 	src.Range(func(key, value any) bool {
-// 		keyVal, ok := key.(string)
-// 		if !ok {
-// 			return false
-// 		}
-// 		regMap[keyVal] = value
-// 		return true
-// 	})
-// 	// Convert to structpb.Struct
-// 	return structpb.NewStruct(regMap)
-// }

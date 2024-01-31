@@ -1,515 +1,438 @@
 package openstack
 
-// func (provider ProviderOpenstack) Deploy(ctx context.Context, request *providerGRPC.DeployRequest) (*providerGRPC.DeployReply, error) {
-// 	logrus.Debugf("Deploy called for deployment \"%s\"", request.DeploymentId)
+import (
+	"context"
+	"fmt"
+	"time"
 
-// 	// Check if the provider has been configured
-// 	if CONFIG == nil {
-// 		return nil, fmt.Errorf("cannot deploy with unconfigured provider, please call Configure()")
-// 	}
+	providerGRPC "github.com/cble-platform/cble-provider-grpc/pkg/provider"
+	"github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud/openstack"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/bootfromvolume"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/images"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
+	"github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v3"
+)
 
-// 	// Generate authenticated client session
-// 	authClient, err := provider.newAuthClient()
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to authenticate: %v", err)
-// 	}
+func (provider ProviderOpenstack) DeployResource(ctx context.Context, request *providerGRPC.DeployResourceRequest) (*providerGRPC.DeployResourceReply, error) {
+	logrus.Debugf("Deploy called for deployment (%s) resource %s", request.Deployment.Id, request.Resource.Key)
 
-// 	// Parse blueprint into struct
-// 	blueprint, err := UnmarshalBlueprintBytesWithVars(request.Blueprint, request.TemplateVars.AsMap())
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to unmarshal blueprint: %v", err)
-// 	}
+	// Check if the provider has been configured
+	if CONFIG == nil {
+		return &providerGRPC.DeployResourceReply{
+			Success: false,
+			Errors:  Errorf("cannot deploy with unconfigured provider, please call Configure()"),
+		}, nil
+	}
 
-// 	// Validate the blueprint is valid
-// 	err = ValidateBlueprint(blueprint)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("blueprint is invalid: %v", err)
-// 	}
+	// Generate authenticated client session
+	authClient, err := provider.newAuthClient()
+	if err != nil {
+		return &providerGRPC.DeployResourceReply{
+			Success: false,
+			Errors:  Errorf("failed to authenticate: %v", err),
+		}, nil
+	}
 
-// 	// Generate local routine-safe var map
-// 	var varMap sync.Map
-// 	for k, v := range request.DeploymentVars.AsMap() {
-// 		varMap.Store(k, v)
-// 	}
-// 	// Generate local routine-safe state map
-// 	var stateMap sync.Map
-// 	for k, v := range request.DeploymentState.AsMap() {
-// 		stateMap.Store(k, v)
-// 	}
+	// Unmarshal the object YAML as struct
+	var object *OpenstackObject
+	err = yaml.Unmarshal(request.Resource.Object, &object)
+	if err != nil {
+		return &providerGRPC.DeployResourceReply{
+			Success: false,
+			Errors:  Errorf("failed to unmarshal resource object: %v", err),
+		}, nil
+	}
 
-// 	response := providerGRPC.DeployReply{
-// 		DeploymentId: request.DeploymentId,
-// 		Status:       commonGRPC.RPCStatus_SUCCESS,
-// 		Errors:       []string{},
-// 	}
+	var updatedVars map[string]string
 
-// 	objectsWg := sync.WaitGroup{}
-// 	for k := range blueprint.Objects {
-// 		objectsWg.Add(1)
-// 		go func(key string) {
-// 			// Wait until all depends_on are done
-// 			err := awaitDependsOn(blueprint, &stateMap, key)
-// 			if err != nil {
-// 				logrus.Errorf("failed to deploy network: %v", err)
-// 			} else {
-// 				switch blueprint.Objects[key].Resource {
-// 				// HOST
-// 				case OpenstackResourceTypeHost:
-// 					// Deploy host
-// 					if err := provider.deployHost(ctx, authClient, request.DeploymentId, &varMap, &stateMap, blueprint, key); err != nil {
-// 						response.Status = commonGRPC.RPCStatus_FAILURE
-// 						response.Errors = append(response.Errors, fmt.Sprintf("failed to deploy host \"%s\": %v", key, err))
-// 					}
-// 				// NETWORK
-// 				case OpenstackResourceTypeNetwork:
-// 					// Deploy network
-// 					if err := provider.deployNetwork(ctx, authClient, request.DeploymentId, &varMap, &stateMap, blueprint, key); err != nil {
-// 						response.Status = commonGRPC.RPCStatus_FAILURE
-// 						response.Errors = append(response.Errors, fmt.Sprintf("failed to deploy host \"%s\": %v", key, err))
-// 					}
-// 				// ROUTER
-// 				case OpenstackResourceTypeRouter:
-// 					// Deploy router
-// 					if err := provider.deployRouter(ctx, authClient, request.DeploymentId, &varMap, &stateMap, blueprint, key); err != nil {
-// 						response.Status = commonGRPC.RPCStatus_FAILURE
-// 						response.Errors = append(response.Errors, fmt.Sprintf("failed to deploy host \"%s\": %v", key, err))
-// 					}
-// 				}
-// 			}
-// 			objectsWg.Done()
-// 		}(k)
-// 	}
-// 	objectsWg.Wait()
+	// Deploy the resource based on the type of resource
+	switch object.Resource {
+	// HOST
+	case OpenstackResourceTypeHost:
+		// Deploy host
+		if updatedVars, err = provider.deployHost(ctx, authClient, request, object, request.Vars, request.DependencyVars); err != nil {
+			return &providerGRPC.DeployResourceReply{
+				Success: false,
+				Errors:  Errorf("failed to deploy host: %v", err),
+			}, nil
+		}
+	// NETWORK
+	case OpenstackResourceTypeNetwork:
+		// Deploy network
+		if updatedVars, err = provider.deployNetwork(ctx, authClient, request, object, request.Vars, request.DependencyVars); err != nil {
+			return &providerGRPC.DeployResourceReply{
+				Success: false,
+				Errors:  Errorf("failed to deploy network: %v", err),
+			}, nil
+		}
+	// ROUTER
+	case OpenstackResourceTypeRouter:
+		// Deploy router
+		if updatedVars, err = provider.deployRouter(ctx, authClient, request, object, request.Vars, request.DependencyVars); err != nil {
+			return &providerGRPC.DeployResourceReply{
+				Success: false,
+				Errors:  Errorf("failed to deploy router: %v", err),
+			}, nil
+		}
+	}
 
-// 	response.DeploymentState, err = marshalSyncMap(&stateMap)
-// 	if err != nil {
-// 		response.Errors = append(response.Errors, fmt.Sprintf("failed to marshal stateMap: %v", err))
-// 	}
-// 	response.DeploymentVars, err = marshalSyncMap(&varMap)
-// 	if err != nil {
-// 		response.Errors = append(response.Errors, fmt.Sprintf("failed to marshal varMap: %v", err))
-// 	}
+	// Return the updated vars
+	return &providerGRPC.DeployResourceReply{
+		Success:     true,
+		Errors:      nil,
+		UpdatedVars: updatedVars,
+	}, nil
+}
 
-// 	return &response, nil
-// }
+func (provider *ProviderOpenstack) deployHost(ctx context.Context, authClient *gophercloud.ProviderClient, request *providerGRPC.DeployResourceRequest, object *OpenstackObject, vars map[string]string, dependencyVars map[string]*providerGRPC.DependencyVars) (map[string]string, error) {
+	logrus.Debugf("Deploying host \"%s\"", request.Resource.Key)
 
-// func (provider *ProviderOpenstack) deployNetwork(ctx context.Context, authClient *gophercloud.ProviderClient, deploymentId string, varMap *sync.Map, stateMap *sync.Map, blueprint *OpenstackBlueprint, networkKey string) error {
-// 	logrus.Debugf("Deploying network \"%s\"", networkKey)
+	// Initialize updated vars to old vars
+	updatedVars := make(map[string]string)
+	for k, v := range vars {
+		updatedVars[k] = v
+	}
 
-// 	var err error
-// 	// Get the network from blueprint
-// 	network, exist := blueprint.Networks[networkKey]
-// 	if !exist {
-// 		stateMap.Store(networkKey, commonGRPC.DeployStateFAILED)
-// 		return fmt.Errorf("network \"%s\" is not defined", networkKey)
-// 	}
+	// Generate the Compute V2 client
+	endpointOpts := gophercloud.EndpointOpts{
+		Region: CONFIG.RegionName,
+	}
+	computeClient, err := openstack.NewComputeV2(authClient, endpointOpts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create compute client: %v", err)
+	}
 
-// 	// Set network as in progress for dependencies
-// 	stateMap.Store(networkKey, commonGRPC.DeployStateINPROGRESS)
+	var hostFlavor *flavors.Flavor = nil
+	allFlavorPages, err := flavors.ListDetail(computeClient, nil).AllPages()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get host flavor \"%s\": %v", object.Host.Flavor, err)
+	}
+	allFlavors, err := flavors.ExtractFlavors(allFlavorPages)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get host flavor \"%s\": %v", object.Host.Flavor, err)
+	}
+	for _, fl := range allFlavors {
+		if fl.Name == object.Host.Flavor || fl.ID == object.Host.Flavor {
+			hostFlavor = &fl
+			break
+		}
+	}
+	if hostFlavor == nil {
+		return nil, fmt.Errorf("failed to get host flavor \"%s\": flavor not found", object.Host.Flavor)
+	}
 
-// 	// Generate the Network V2 client
-// 	endpointOpts := gophercloud.EndpointOpts{
-// 		Name:   "neutron",
-// 		Region: CONFIG.RegionName,
-// 	}
-// 	networkClient, err := openstack.NewNetworkV2(authClient, endpointOpts)
-// 	if err != nil {
-// 		stateMap.Store(networkKey, commonGRPC.DeployStateFAILED)
-// 		return fmt.Errorf("failed to create openstack network client: %v", err)
-// 	}
+	logrus.Debugf("got flavor %s (%s)", hostFlavor.Name, hostFlavor.ID)
 
-// 	networkName := networkKey
-// 	if network.Name != nil {
-// 		networkName = *network.Name
-// 	}
-// 	// Prepend the first 8 bytes of deployment ID
-// 	networkName = deploymentId[:8] + "-" + networkName
+	var hostImage *images.Image = nil
+	allImagePages, err := images.ListDetail(computeClient, nil).AllPages()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get host image \"%s\": %v", object.Host.Image, err)
+	}
+	allImages, err := images.ExtractImages(allImagePages)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get host image \"%s\": %v", object.Host.Image, err)
+	}
+	for _, img := range allImages {
+		if img.Name == object.Host.Image || img.ID == object.Host.Image {
+			hostImage = &img
+			break
+		}
+	}
+	if hostImage == nil {
+		return nil, fmt.Errorf("failed to get host image \"%s\": image not found", object.Host.Image)
+	}
 
-// 	// Create the network
-// 	deployedNetwork, err := networks.Create(networkClient, networks.CreateOpts{
-// 		Name:         networkName,
-// 		AdminStateUp: gophercloud.Enabled,
-// 	}).Extract()
-// 	if err != nil {
-// 		stateMap.Store(networkKey, commonGRPC.DeployStateFAILED)
-// 		return fmt.Errorf("failed to create network: %v", err)
-// 	}
+	// Check if the image requires more space than provided
+	if object.Host.DiskSize < hostImage.MinDisk {
+		return nil, fmt.Errorf("host disk size is too small for image (minimum %dGB required)", hostImage.MinDisk)
+	}
 
-// 	// Save the deployed network id into vars
-// 	varMap.Store(networkKey+"_id", deployedNetwork.ID)
+	logrus.Debugf("got image %s (%s)", hostImage.Name, hostImage.ID)
 
-// 	// Configure the subnet on the network
-// 	var gatewayIp *string = nil
-// 	if network.Gateway != nil {
-// 		gatewayString := network.Gateway.String()
-// 		gatewayIp = &gatewayString
-// 	}
-// 	dhcpPools := []subnets.AllocationPool{}
-// 	for _, dhcp := range network.DHCP {
-// 		dhcpPools = append(dhcpPools, subnets.AllocationPool{
-// 			Start: dhcp.Start.String(),
-// 			End:   dhcp.End.String(),
-// 		})
-// 	}
-// 	dnsServers := []string{}
-// 	for _, resolverIP := range network.Resolvers {
-// 		dnsServers = append(dnsServers, resolverIP.String())
-// 	}
+	// Use either key or provided name as instance name
+	instanceName := object.Host.Hostname
+	if object.Host.Name != nil {
+		instanceName = *object.Host.Name
+	}
+	// Prepend the first 8 bytes of deployment ID
+	instanceName = request.Deployment.Id[:8] + "-" + instanceName
 
-// 	// Create openstack subnet on network
-// 	deployedSubnet, err := subnets.Create(networkClient, subnets.CreateOpts{
-// 		NetworkID:       deployedNetwork.ID,
-// 		CIDR:            network.Subnet.String(),
-// 		Name:            networkName,
-// 		Description:     fmt.Sprintf("%s Subnet for Network \"%s\"", network.Subnet.String(), networkName),
-// 		AllocationPools: dhcpPools,
-// 		GatewayIP:       gatewayIp,
-// 		IPVersion:       gophercloud.IPv4,
-// 		EnableDHCP:      gophercloud.Enabled,
-// 		DNSNameservers:  dnsServers,
-// 	}).Extract()
-// 	if err != nil {
-// 		stateMap.Store(networkKey, commonGRPC.DeployStateFAILED)
-// 		return fmt.Errorf("failed to create subnet: %v", err)
-// 	}
+	// Configure the volume to clone from the image
+	blockOps := []bootfromvolume.BlockDevice{
+		{
+			UUID:                hostImage.ID,
+			BootIndex:           0,
+			DeleteOnTermination: true,
+			DestinationType:     bootfromvolume.DestinationVolume,
+			SourceType:          bootfromvolume.SourceImage,
+			VolumeSize:          object.Host.DiskSize,
+		},
+	}
 
-// 	// Save the deployed network subnet id into vars
-// 	varMap.Store(networkKey+"_subnet_id", deployedSubnet.ID)
+	// Create network mappings for each network attachment
+	hostNetworks := []servers.Network{}
+	for k, networkAttachment := range object.Host.Networks {
+		// Extract the network vars from dependencyVars
+		networkVars, ok := dependencyVars[k]
+		if !ok {
+			return nil, fmt.Errorf("failed to get vars for network %s", k)
+		}
 
-// 	logrus.Debugf("Successfully deployed network %s as network %s (%s)", networkKey, deployedNetwork.Name, deployedNetwork.ID)
+		networkId, exists := networkVars.Vars["id"]
+		if !exists {
+			return nil, fmt.Errorf("ID unknown for network \"%s\"", k)
+		}
+		PLACEHOLDER_NET := servers.Network{
+			UUID: networkId,
+		}
+		if !networkAttachment.DHCP && networkAttachment.IP != nil {
+			PLACEHOLDER_NET.FixedIP = networkAttachment.IP.String()
+		}
+		hostNetworks = append(hostNetworks, PLACEHOLDER_NET)
+	}
 
-// 	// Set network as succeeded for dependencies
-// 	stateMap.Store(networkKey, commonGRPC.DeployStateSUCCEEDED)
+	// Configure the instance options
+	hostOps := servers.CreateOpts{
+		Name:      instanceName,
+		ImageRef:  hostImage.ID,
+		FlavorRef: hostFlavor.ID,
+		UserData:  object.Host.UserData,
+		Networks:  hostNetworks,
+	}
 
-// 	return nil
-// }
+	// Create the host
+	createOpts := bootfromvolume.CreateOptsExt{
+		CreateOptsBuilder: hostOps,
+		BlockDevice:       blockOps,
+	}
+	deployedServer, err := bootfromvolume.Create(computeClient, createOpts).Extract()
+	if err != nil {
+		return nil, fmt.Errorf("failed to deploy host: %v", err)
+	}
 
-// func (provider *ProviderOpenstack) deployRouter(ctx context.Context, authClient *gophercloud.ProviderClient, deploymentId string, varMap *sync.Map, stateMap *sync.Map, blueprint *OpenstackBlueprint, routerKey string) error {
-// 	logrus.Debugf("Deploying router \"%s\"", routerKey)
+	// Save the deployed host into vars
+	updatedVars["id"] = deployedServer.ID
 
-// 	var err error
-// 	// Get the router from blueprint
-// 	router, exist := blueprint.Routers[routerKey]
-// 	if !exist {
-// 		stateMap.Store(routerKey, commonGRPC.DeployStateFAILED)
-// 		return fmt.Errorf("router \"%s\" is not defined", routerKey)
-// 	}
+	// Wait for server to be in ACTIVE state
+	for {
+		// Get the updated server from Openstack
+		deployedServer, err = servers.Get(computeClient, deployedServer.ID).Extract()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get openstack server status: %v", err)
+		}
+		if deployedServer.Status == "ERROR" {
+			// Something happened and this failed
+			return nil, fmt.Errorf("failed to deploy host: server in ERROR state")
+		}
+		if deployedServer.Status == "ACTIVE" {
+			// Server deployed properly
+			break
+		}
+		// Wait 5 seconds before checking again
+		time.Sleep(5 * time.Second)
+	}
 
-// 	// Set router as in progress for dependencies
-// 	stateMap.Store(routerKey, commonGRPC.DeployStateINPROGRESS)
+	logrus.Debugf("Successfully deployed host %s as server %s (%s)", request.Resource.Key, deployedServer.Name, deployedServer.ID)
 
-// 	// Generate the Network V2 client
-// 	endpointOpts := gophercloud.EndpointOpts{
-// 		Name:   "neutron",
-// 		Region: CONFIG.RegionName,
-// 	}
-// 	networkClient, err := openstack.NewNetworkV2(authClient, endpointOpts)
-// 	if err != nil {
-// 		stateMap.Store(routerKey, commonGRPC.DeployStateFAILED)
-// 		return fmt.Errorf("failed to create openstack network client: %v", err)
-// 	}
+	return updatedVars, nil
+}
 
-// 	// Find the external network
-// 	var routerExternalNetwork *networks.Network = nil
-// 	allNetworkPages, err := networks.List(networkClient, nil).AllPages()
-// 	if err != nil {
-// 		stateMap.Store(routerKey, commonGRPC.DeployStateFAILED)
-// 		return fmt.Errorf("failed to get router external network \"%s\": %v", router.ExternalNetwork, err)
-// 	}
-// 	allNetworks, err := networks.ExtractNetworks(allNetworkPages)
-// 	if err != nil {
-// 		stateMap.Store(routerKey, commonGRPC.DeployStateFAILED)
-// 		return fmt.Errorf("failed to get router external network \"%s\": %v", router.ExternalNetwork, err)
-// 	}
-// 	for _, net := range allNetworks {
-// 		if net.Name == router.ExternalNetwork || net.ID == router.ExternalNetwork {
-// 			routerExternalNetwork = &net
-// 			break
-// 		}
-// 	}
-// 	if routerExternalNetwork == nil {
-// 		stateMap.Store(routerKey, commonGRPC.DeployStateFAILED)
-// 		return fmt.Errorf("failed to get router external network \"%s\": network not found", router.ExternalNetwork)
-// 	}
+func (provider *ProviderOpenstack) deployNetwork(ctx context.Context, authClient *gophercloud.ProviderClient, request *providerGRPC.DeployResourceRequest, object *OpenstackObject, vars map[string]string, dependencyVars map[string]*providerGRPC.DependencyVars) (map[string]string, error) {
+	logrus.Debugf("Deploying network \"%s\"", request.Resource.Key)
 
-// 	// Prepend the first 8 bytes of deployment ID
-// 	routerName := deploymentId[:8] + "-" + routerKey
+	// Initialize updated vars to old vars
+	updatedVars := make(map[string]string)
+	for k, v := range vars {
+		updatedVars[k] = v
+	}
 
-// 	routerConfig := routers.CreateOpts{
-// 		Name:         routerName,
-// 		Description:  "",
-// 		AdminStateUp: gophercloud.Enabled,
-// 		GatewayInfo: &routers.GatewayInfo{
-// 			NetworkID: routerExternalNetwork.ID,
-// 		},
-// 	}
-// 	if router.Name != nil {
-// 		routerConfig.Name = *router.Name
-// 	}
-// 	if router.Description != nil {
-// 		routerConfig.Description = *router.Description
-// 	}
+	// Generate the Network V2 client
+	endpointOpts := gophercloud.EndpointOpts{
+		Name:   "neutron",
+		Region: CONFIG.RegionName,
+	}
+	networkClient, err := openstack.NewNetworkV2(authClient, endpointOpts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create openstack network client: %v", err)
+	}
 
-// 	// Deploy the router
-// 	deployedRouter, err := routers.Create(networkClient, routerConfig).Extract()
-// 	if err != nil {
-// 		stateMap.Store(routerKey, commonGRPC.DeployStateFAILED)
-// 		return fmt.Errorf("failed to create router: %v", err)
-// 	}
+	networkName := request.Resource.Key
+	if object.Network.Name != nil {
+		networkName = *object.Network.Name
+	}
+	// Prepend the first 8 bytes of deployment ID
+	networkName = request.Deployment.Id[:8] + "-" + networkName
 
-// 	// Save the deployed router into vars
-// 	varMap.Store(routerKey+"_id", deployedRouter.ID)
+	// Create the network
+	deployedNetwork, err := networks.Create(networkClient, networks.CreateOpts{
+		Name:         networkName,
+		AdminStateUp: gophercloud.Enabled,
+	}).Extract()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create network: %v", err)
+	}
 
-// 	// Connect router to all attached networks
+	// Save the deployed network id into vars
+	updatedVars["id"] = deployedNetwork.ID
 
-// 	for k, networkAttachment := range router.Networks {
-// 		networkId, exists := varMap.Load(k + "_id")
-// 		if !exists {
-// 			stateMap.Store(routerKey, commonGRPC.DeployStateFAILED)
-// 			return fmt.Errorf("ID unknown for network \"%s\"", k)
-// 		}
-// 		networkSubnetId, exists := varMap.Load(k + "_subnet_id")
-// 		if !exists {
-// 			stateMap.Store(routerKey, commonGRPC.DeployStateFAILED)
-// 			return fmt.Errorf("ID unknown for network \"%s\" subnet", k)
-// 		}
-// 		// Create Openstack port for router on subnet
-// 		osPort, err := ports.Create(networkClient, ports.CreateOpts{
-// 			NetworkID:    networkId.(string),
-// 			AdminStateUp: gophercloud.Enabled,
-// 			FixedIPs: []ports.IP{{
-// 				SubnetID:  networkSubnetId.(string),
-// 				IPAddress: networkAttachment.IP.String(),
-// 			}},
-// 		}).Extract()
-// 		if err != nil {
-// 			stateMap.Store(routerKey, commonGRPC.DeployStateFAILED)
-// 			return fmt.Errorf("failed to create port for router: %v", err)
-// 		}
+	// Configure the subnet on the network
+	var gatewayIp *string = nil
+	if object.Network.Gateway != nil {
+		gatewayString := object.Network.Gateway.String()
+		gatewayIp = &gatewayString
+	}
+	dhcpPools := []subnets.AllocationPool{}
+	for _, dhcp := range object.Network.DHCP {
+		dhcpPools = append(dhcpPools, subnets.AllocationPool{
+			Start: dhcp.Start.String(),
+			End:   dhcp.End.String(),
+		})
+	}
+	dnsServers := []string{}
+	for _, resolverIP := range object.Network.Resolvers {
+		dnsServers = append(dnsServers, resolverIP.String())
+	}
 
-// 		// Save the deployed router network port into vars
-// 		varMap.Store(routerKey+"_"+k+"_port_id", osPort.ID)
+	// Create openstack subnet on network
+	deployedSubnet, err := subnets.Create(networkClient, subnets.CreateOpts{
+		NetworkID:       deployedNetwork.ID,
+		CIDR:            object.Network.Subnet.String(),
+		Name:            networkName,
+		Description:     fmt.Sprintf("%s Subnet for Network \"%s\"", object.Network.Subnet.String(), networkName),
+		AllocationPools: dhcpPools,
+		GatewayIP:       gatewayIp,
+		IPVersion:       gophercloud.IPv4,
+		EnableDHCP:      gophercloud.Enabled,
+		DNSNameservers:  dnsServers,
+	}).Extract()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create subnet: %v", err)
+	}
 
-// 		// We don't need to store this ID since it will get auto-deleted on router delete
-// 		_, err = routers.AddInterface(networkClient, deployedRouter.ID, routers.AddInterfaceOpts{
-// 			PortID: osPort.ID,
-// 		}).Extract()
-// 		if err != nil {
-// 			stateMap.Store(routerKey, commonGRPC.DeployStateFAILED)
-// 			return fmt.Errorf("failed to create router interface: %v", err)
-// 		}
-// 	}
+	// Save the deployed network subnet id into vars
+	updatedVars["subnet_id"] = deployedSubnet.ID
 
-// 	logrus.Debugf("Successfully deployed router %s as router %s (%s)", routerKey, deployedRouter.Name, deployedRouter.ID)
+	logrus.Debugf("Successfully deployed network %s as network %s (%s)", request.Resource.Key, deployedNetwork.Name, deployedNetwork.ID)
 
-// 	// Set router as succeeded for dependencies
-// 	stateMap.Store(routerKey, commonGRPC.DeployStateSUCCEEDED)
+	return updatedVars, nil
+}
 
-// 	return nil
-// }
+func (provider *ProviderOpenstack) deployRouter(ctx context.Context, authClient *gophercloud.ProviderClient, request *providerGRPC.DeployResourceRequest, object *OpenstackObject, vars map[string]string, dependencyVars map[string]*providerGRPC.DependencyVars) (map[string]string, error) {
+	logrus.Debugf("Deploying router \"%s\"", request.Resource.Key)
 
-// func (provider *ProviderOpenstack) deployHost(ctx context.Context, authClient *gophercloud.ProviderClient, deploymentId string, varMap *sync.Map, stateMap *sync.Map, blueprint *OpenstackBlueprint, hostKey string) error {
-// 	logrus.Debugf("Deploying host \"%s\"", hostKey)
+	// Initialize updated vars to old vars
+	updatedVars := make(map[string]string)
+	for k, v := range vars {
+		updatedVars[k] = v
+	}
 
-// 	var err error
-// 	// Get the host from blueprint
-// 	host, exist := blueprint.Hosts[hostKey]
-// 	if !exist {
-// 		stateMap.Store(hostKey, commonGRPC.DeployStateFAILED)
-// 		return fmt.Errorf("host \"%s\" is not defined", hostKey)
-// 	}
+	// Generate the Network V2 client
+	endpointOpts := gophercloud.EndpointOpts{
+		Name:   "neutron",
+		Region: CONFIG.RegionName,
+	}
+	networkClient, err := openstack.NewNetworkV2(authClient, endpointOpts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create openstack network client: %v", err)
+	}
 
-// 	// Set host as in progress for dependencies
-// 	stateMap.Store(hostKey, commonGRPC.DeployStateINPROGRESS)
+	// Find the external network
+	var routerExternalNetwork *networks.Network = nil
+	allNetworkPages, err := networks.List(networkClient, nil).AllPages()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get router external network \"%s\": %v", object.Router.ExternalNetwork, err)
+	}
+	allNetworks, err := networks.ExtractNetworks(allNetworkPages)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get router external network \"%s\": %v", object.Router.ExternalNetwork, err)
+	}
+	for _, net := range allNetworks {
+		if net.Name == object.Router.ExternalNetwork || net.ID == object.Router.ExternalNetwork {
+			routerExternalNetwork = &net
+			break
+		}
+	}
+	if routerExternalNetwork == nil {
+		return nil, fmt.Errorf("failed to get router external network \"%s\": network not found", object.Router.ExternalNetwork)
+	}
 
-// 	// Generate the Compute V2 client
-// 	endpointOpts := gophercloud.EndpointOpts{
-// 		Region: CONFIG.RegionName,
-// 	}
-// 	computeClient, err := openstack.NewComputeV2(authClient, endpointOpts)
-// 	if err != nil {
-// 		stateMap.Store(hostKey, commonGRPC.DeployStateFAILED)
-// 		return fmt.Errorf("failed to create compute v2 client: %v", err)
-// 	}
+	// Prepend the first 8 bytes of deployment ID
+	routerName := request.Deployment.Id[:8] + "-" + request.Resource.Key
 
-// 	var hostFlavor *flavors.Flavor = nil
-// 	allFlavorPages, err := flavors.ListDetail(computeClient, nil).AllPages()
-// 	if err != nil {
-// 		stateMap.Store(hostKey, commonGRPC.DeployStateFAILED)
-// 		return fmt.Errorf("failed to get host flavor \"%s\": %v", host.Flavor, err)
-// 	}
-// 	allFlavors, err := flavors.ExtractFlavors(allFlavorPages)
-// 	if err != nil {
-// 		stateMap.Store(hostKey, commonGRPC.DeployStateFAILED)
-// 		return fmt.Errorf("failed to get host flavor \"%s\": %v", host.Flavor, err)
-// 	}
-// 	for _, fl := range allFlavors {
-// 		if fl.Name == host.Flavor || fl.ID == host.Flavor {
-// 			hostFlavor = &fl
-// 			break
-// 		}
-// 	}
-// 	if hostFlavor == nil {
-// 		stateMap.Store(hostKey, commonGRPC.DeployStateFAILED)
-// 		return fmt.Errorf("failed to get host flavor \"%s\": flavor not found", host.Flavor)
-// 	}
+	routerConfig := routers.CreateOpts{
+		Name:         routerName,
+		Description:  "",
+		AdminStateUp: gophercloud.Enabled,
+		GatewayInfo: &routers.GatewayInfo{
+			NetworkID: routerExternalNetwork.ID,
+		},
+	}
+	if object.Router.Name != nil {
+		routerConfig.Name = *object.Router.Name
+	}
+	if object.Router.Description != nil {
+		routerConfig.Description = *object.Router.Description
+	}
 
-// 	logrus.Debugf("got flavor %s (%s)", hostFlavor.Name, hostFlavor.ID)
+	// Deploy the router
+	deployedRouter, err := routers.Create(networkClient, routerConfig).Extract()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create router: %v", err)
+	}
 
-// 	var hostImage *images.Image = nil
-// 	allImagePages, err := images.ListDetail(computeClient, nil).AllPages()
-// 	if err != nil {
-// 		stateMap.Store(hostKey, commonGRPC.DeployStateFAILED)
-// 		return fmt.Errorf("failed to get host image \"%s\": %v", host.Image, err)
-// 	}
-// 	allImages, err := images.ExtractImages(allImagePages)
-// 	if err != nil {
-// 		stateMap.Store(hostKey, commonGRPC.DeployStateFAILED)
-// 		return fmt.Errorf("failed to get host image \"%s\": %v", host.Image, err)
-// 	}
-// 	for _, img := range allImages {
-// 		if img.Name == host.Image || img.ID == host.Image {
-// 			hostImage = &img
-// 			break
-// 		}
-// 	}
-// 	if hostImage == nil {
-// 		stateMap.Store(hostKey, commonGRPC.DeployStateFAILED)
-// 		return fmt.Errorf("failed to get host image \"%s\": image not found", host.Image)
-// 	}
+	// Save the deployed router into vars
+	updatedVars["id"] = deployedRouter.ID
 
-// 	// Check if the image requires more space than provided
-// 	if host.DiskSize < hostImage.MinDisk {
-// 		stateMap.Store(hostKey, commonGRPC.DeployStateFAILED)
-// 		return fmt.Errorf("host disk size is too small for image (minimum %dGB required)", hostImage.MinDisk)
-// 	}
+	// Connect router to all attached networks
+	for k, networkAttachment := range object.Router.Networks {
+		// Extract the network vars from dependencyVars
+		networkVars, ok := dependencyVars[k]
+		if !ok {
+			return nil, fmt.Errorf("failed to get vars for network %s", k)
+		}
 
-// 	logrus.Debugf("got image %s (%s)", hostImage.Name, hostImage.ID)
+		// Get network and subnet ID's
+		networkId, exists := networkVars.Vars["id"]
+		if !exists {
+			return nil, fmt.Errorf("ID unknown for network \"%s\"", k)
+		}
+		networkSubnetId, exists := networkVars.Vars["subnet_id"]
+		if !exists {
+			return nil, fmt.Errorf("ID unknown for network \"%s\" subnet", k)
+		}
+		// Create Openstack port for router on subnet
+		osPort, err := ports.Create(networkClient, ports.CreateOpts{
+			NetworkID:    networkId,
+			AdminStateUp: gophercloud.Enabled,
+			FixedIPs: []ports.IP{{
+				SubnetID:  networkSubnetId,
+				IPAddress: networkAttachment.IP.String(),
+			}},
+		}).Extract()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create port for router: %v", err)
+		}
 
-// 	// Use either key or provided name as instance name
-// 	instanceName := host.Hostname
-// 	if host.Name != nil {
-// 		instanceName = *host.Name
-// 	}
-// 	// Prepend the first 8 bytes of deployment ID
-// 	instanceName = deploymentId[:8] + "-" + instanceName
+		// Save the deployed router network port into vars
+		updatedVars[k+"_port_id"] = osPort.ID
 
-// 	// Configure the volume to clone from the image
-// 	blockOps := []bootfromvolume.BlockDevice{
-// 		{
-// 			UUID:                hostImage.ID,
-// 			BootIndex:           0,
-// 			DeleteOnTermination: true,
-// 			DestinationType:     bootfromvolume.DestinationVolume,
-// 			SourceType:          bootfromvolume.SourceImage,
-// 			VolumeSize:          host.DiskSize,
-// 		},
-// 	}
+		// We don't need to store this ID since it will get auto-deleted on router delete
+		_, err = routers.AddInterface(networkClient, deployedRouter.ID, routers.AddInterfaceOpts{
+			PortID: osPort.ID,
+		}).Extract()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create router interface: %v", err)
+		}
+	}
 
-// 	// Create network mappings for each network attachment
-// 	hostNetworks := []servers.Network{}
-// 	for k, networkAttachment := range host.Networks {
-// 		_, exists := blueprint.Networks[k]
-// 		if !exists {
-// 			stateMap.Store(hostKey, commonGRPC.DeployStateFAILED)
-// 			return fmt.Errorf("network \"%s\" is not defined", k)
-// 		}
-// 		networkId, exists := varMap.Load(k + "_id")
-// 		if !exists {
-// 			stateMap.Store(hostKey, commonGRPC.DeployStateFAILED)
-// 			return fmt.Errorf("ID unknown for network \"%s\"", k)
-// 		}
-// 		PLACEHOLDER_NET := servers.Network{
-// 			UUID: networkId.(string),
-// 		}
-// 		if !networkAttachment.DHCP && networkAttachment.IP != nil {
-// 			PLACEHOLDER_NET.FixedIP = networkAttachment.IP.String()
-// 		}
-// 		hostNetworks = append(hostNetworks, PLACEHOLDER_NET)
-// 	}
+	logrus.Debugf("Successfully deployed router %s as router %s (%s)", request.Resource.Key, deployedRouter.Name, deployedRouter.ID)
 
-// 	// Configure the instance options
-// 	hostOps := servers.CreateOpts{
-// 		Name:      instanceName,
-// 		ImageRef:  hostImage.ID,
-// 		FlavorRef: hostFlavor.ID,
-// 		UserData:  host.UserData,
-// 		Networks:  hostNetworks,
-// 	}
-
-// 	// Create the host
-// 	createOpts := bootfromvolume.CreateOptsExt{
-// 		CreateOptsBuilder: hostOps,
-// 		BlockDevice:       blockOps,
-// 	}
-// 	deployedServer, err := bootfromvolume.Create(computeClient, createOpts).Extract()
-// 	if err != nil {
-// 		stateMap.Store(hostKey, commonGRPC.DeployStateFAILED)
-// 		return fmt.Errorf("failed to deploy host: %v", err)
-// 	}
-
-// 	// Save the deployed host into vars
-// 	varMap.Store(hostKey+"_id", deployedServer.ID)
-
-// 	// Wait for server to be in ACTIVE state
-// 	for {
-// 		// Get the updated server from Openstack
-// 		deployedServer, err = servers.Get(computeClient, deployedServer.ID).Extract()
-// 		if err != nil {
-// 			stateMap.Store(hostKey, commonGRPC.DeployStateFAILED)
-// 			return fmt.Errorf("failed to get openstack server status: %v", err)
-// 		}
-// 		if deployedServer.Status == "ERROR" {
-// 			// Something happened and this failed
-// 			stateMap.Store(hostKey, commonGRPC.DeployStateFAILED)
-// 			return fmt.Errorf("failed to deploy host: server in ERROR state")
-// 		}
-// 		if deployedServer.Status == "ACTIVE" {
-// 			// Server deployed properly
-// 			break
-// 		}
-// 		// Wait 5 seconds before checking again
-// 		time.Sleep(5 * time.Second)
-// 	}
-
-// 	logrus.Debugf("Successfully deployed host %s as server %s (%s)", hostKey, deployedServer.Name, deployedServer.ID)
-
-// 	// Set host as succeeded for dependencies
-// 	stateMap.Store(hostKey, commonGRPC.DeployStateSUCCEEDED)
-
-// 	return nil
-// }
-
-// // Blocks execution until all depends_on are done.
-// func awaitDependsOn(blueprint *OpenstackBlueprint, stateMap *sync.Map, key string) error {
-// 	// Check on dependencies
-// 	for {
-// 		waitingOnDependents := false
-// 		for _, dependsOnKey := range blueprint.Objects[key].DependsOn {
-// 			dependsOnDeploymentValue, exists := stateMap.Load(dependsOnKey)
-// 			if exists {
-// 				dependsOnDeploymentState := dependsOnDeploymentValue.(string)
-// 				if dependsOnDeploymentState == commonGRPC.DeployStateFAILED {
-// 					return fmt.Errorf("\"%s\" dependency \"%s\" failed", key, dependsOnKey)
-// 				} else if dependsOnDeploymentState == commonGRPC.DeployStateSUCCEEDED {
-// 					// Dependent is deployed so we're good
-// 					continue
-// 				} else {
-// 					logrus.Debugf("\"%s\" is waiting on \"%s\"", key, dependsOnKey)
-// 					// early break since no need to check others if a single dependency is still inactive
-// 					waitingOnDependents = true
-// 					break
-// 				}
-// 			} else {
-// 				waitingOnDependents = true
-// 			}
-// 		}
-// 		// If all depends on objects are done
-// 		if !waitingOnDependents {
-// 			break
-// 		}
-// 		// Wait 5 secs before checking again
-// 		time.Sleep(5 * time.Second)
-// 	}
-// 	return nil
-// }
+	return updatedVars, nil
+}
