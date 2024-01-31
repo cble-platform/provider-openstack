@@ -5,7 +5,6 @@ import (
 	"os"
 
 	cbleGRPC "github.com/cble-platform/cble-provider-grpc/pkg/cble"
-	commonGRPC "github.com/cble-platform/cble-provider-grpc/pkg/common"
 	providerGRPC "github.com/cble-platform/cble-provider-grpc/pkg/provider"
 	"github.com/cble-platform/provider-openstack/openstack"
 	"github.com/google/uuid"
@@ -61,12 +60,10 @@ func main() {
 			Console: true,
 		},
 	})
-	if err != nil || registerReply.Status == commonGRPC.RPCStatus_FAILURE {
+	if err != nil || !registerReply.Success {
 		logrus.Fatalf("registration failed: %v", err)
-	} else if registerReply.Status == commonGRPC.RPCStatus_SUCCESS {
-		logrus.Printf("Registration success! Starting provider server on socket /tmp/cble-provider-grpc-%s", registerReply.SocketId)
 	} else {
-		logrus.Fatalf("unknown error occurred: %v", err)
+		logrus.Printf("Registration success! Starting provider server on socket /tmp/cble-provider-grpc-%s", registerReply.SocketId)
 	}
 
 	defer func() {
@@ -76,12 +73,10 @@ func main() {
 			Name:    provider.Name(),
 			Version: provider.Version(),
 		})
-		if err != nil || unregisterReply.Status == commonGRPC.RPCStatus_FAILURE {
+		if err != nil || !unregisterReply.Success {
 			logrus.Fatalf("unregistration failed: %v", err)
-		} else if unregisterReply.Status == commonGRPC.RPCStatus_SUCCESS {
-			logrus.Print("Unregistration success! Shutting down...")
 		} else {
-			logrus.Fatalf("unknown error occurred: %v", err)
+			logrus.Print("Unregistration success! Shutting down...")
 		}
 	}()
 

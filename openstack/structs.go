@@ -5,7 +5,7 @@ import (
 	"net"
 	"net/netip"
 
-	"github.com/cble-platform/cble-backend/providers"
+	"github.com/cble-platform/cble-backend/blueprintengine/models"
 	"gopkg.in/yaml.v3"
 )
 
@@ -19,7 +19,7 @@ const (
 
 type OpenstackBlueprint struct {
 	// Inherit standard object values
-	providers.Blueprint `yaml:",inline"`
+	models.Blueprint `yaml:",inline"`
 	// Openstack specific values
 	Objects  map[string]OpenstackObject  `yaml:",inline"`
 	Hosts    map[string]OpenstackHost    `yaml:"-"`
@@ -29,7 +29,7 @@ type OpenstackBlueprint struct {
 
 type OpenstackObject struct {
 	// Inherit standard object values
-	providers.Object `yaml:",inline"`
+	models.Object `yaml:",inline"`
 	// Openstack specific values
 	Resource OpenstackResourceType `yaml:"-"`
 	Host     *OpenstackHost        `yaml:"-"`
