@@ -5,7 +5,7 @@ import (
 	"net"
 	"net/netip"
 
-	"github.com/cble-platform/cble-backend/blueprintengine/models"
+	"github.com/cble-platform/cble-backend/engine/models"
 	"gopkg.in/yaml.v3"
 )
 

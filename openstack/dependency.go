@@ -23,13 +23,13 @@ func (provider ProviderOpenstack) GenerateDependencies(ctx context.Context, requ
 	for _, resource := range request.Resources {
 		logrus.Debugf("Generating dependencies for resource %s", resource.Key)
 
-		// Marshal the object YAML as struct
+		// Unmarshal the object YAML as struct
 		var object OpenstackObject
 		err := yaml.Unmarshal(resource.Object, &object)
 		if err != nil {
 			return &providerGRPC.GenerateDependenciesReply{
 				Success:      false,
-				Errors:       ErrorString(fmt.Sprintf("failed to marshal object for resource %s: %v", resource.Key, err)),
+				Errors:       Errorf(fmt.Sprintf("failed to marshal object for resource %s: %v", resource.Key, err)),
 				Dependencies: nil,
 			}, nil
 		}
@@ -44,7 +44,7 @@ func (provider ProviderOpenstack) GenerateDependencies(ctx context.Context, requ
 				if _, ok := resourceMap[nk]; !ok {
 					return &providerGRPC.GenerateDependenciesReply{
 						Success: false,
-						Errors:  ErrorString(fmt.Sprintf("host %s depends on network %s which doesn't exist", resource.Key, nk)),
+						Errors:  Errorf(fmt.Sprintf("host %s depends on network %s which doesn't exist", resource.Key, nk)),
 					}, nil
 				}
 				logrus.Debugf("\tAdding host dependency on network %s", nk)
@@ -58,7 +58,7 @@ func (provider ProviderOpenstack) GenerateDependencies(ctx context.Context, requ
 				if _, ok := resourceMap[nk]; !ok {
 					return &providerGRPC.GenerateDependenciesReply{
 						Success: false,
-						Errors:  ErrorString(fmt.Sprintf("router %s depends on network %s which doesn't exist", resource.Key, nk)),
+						Errors:  Errorf(fmt.Sprintf("router %s depends on network %s which doesn't exist", resource.Key, nk)),
 					}, nil
 				}
 				logrus.Debugf("\tAdding host dependency on network %s", nk)
@@ -73,7 +73,7 @@ func (provider ProviderOpenstack) GenerateDependencies(ctx context.Context, requ
 			if _, ok := resourceMap[dependsOnKey]; !ok {
 				return &providerGRPC.GenerateDependenciesReply{
 					Success: false,
-					Errors:  ErrorString(fmt.Sprintf("resource %s depends on resource %s which doesn't exist", resource.Key, dependsOnKey)),
+					Errors:  Errorf(fmt.Sprintf("resource %s depends on resource %s which doesn't exist", resource.Key, dependsOnKey)),
 				}, nil
 			}
 			logrus.Debugf("\tAdding dependency %s", dependsOnKey)
