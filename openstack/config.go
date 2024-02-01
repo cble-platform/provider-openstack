@@ -32,7 +32,7 @@ func ConfigFromBytes(in []byte) (*ProviderOpenstackConfig, error) {
 }
 
 func (provider ProviderOpenstack) Configure(ctx context.Context, request *providerGRPC.ConfigureRequest) (*providerGRPC.ConfigureReply, error) {
-	logrus.Debugf("Configure called with %d byte config", len(request.Config))
+	logrus.Debugf("----- Configure called with %d byte config -----", len(request.Config))
 
 	config, err := ConfigFromBytes(request.Config)
 	if err != nil {

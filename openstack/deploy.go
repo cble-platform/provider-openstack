@@ -21,7 +21,7 @@ import (
 )
 
 func (provider ProviderOpenstack) DeployResource(ctx context.Context, request *providerGRPC.DeployResourceRequest) (*providerGRPC.DeployResourceReply, error) {
-	logrus.Debugf("Deploy called for deployment (%s) resource %s", request.Deployment.Id, request.Resource.Key)
+	logrus.Debugf("----- DeployResource called for deployment (%s) resource %s -----", request.Deployment.Id, request.Resource.Key)
 
 	// Check if the provider has been configured
 	if CONFIG == nil {
