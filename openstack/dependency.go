@@ -10,7 +10,7 @@ import (
 )
 
 func (provider ProviderOpenstack) GenerateDependencies(ctx context.Context, request *providerGRPC.GenerateDependenciesRequest) (*providerGRPC.GenerateDependenciesReply, error) {
-	logrus.Debugf("GenerateDependencies called with %d resources", len(request.Resources))
+	logrus.Debugf("----- GenerateDependencies called with %d resources -----", len(request.Resources))
 
 	// Convert the resource list into a key:resource map
 	resourceMap := make(map[string]*providerGRPC.Resource)
