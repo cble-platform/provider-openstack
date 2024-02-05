@@ -50,10 +50,18 @@ func (provider ProviderOpenstack) DeployResource(ctx context.Context, request *p
 		}, nil
 	}
 
+	// Check this is a resource (not data)
+	if object.Resource == nil {
+		return &providerGRPC.DeployResourceReply{
+			Success: false,
+			Errors:  Errorf("cannot deploy data object"),
+		}, nil
+	}
+
 	var updatedVars map[string]string
 
 	// Deploy the resource based on the type of resource
-	switch object.Resource {
+	switch *object.Resource {
 	// HOST
 	case OpenstackResourceTypeHost:
 		// Deploy host
@@ -343,24 +351,14 @@ func (provider *ProviderOpenstack) deployRouter(ctx context.Context, authClient 
 		return nil, fmt.Errorf("failed to create openstack network client: %v", err)
 	}
 
-	// Find the external network
-	var routerExternalNetwork *networks.Network = nil
-	allNetworkPages, err := networks.List(networkClient, nil).AllPages()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get router external network \"%s\": %v", object.Router.ExternalNetwork, err)
+	// Pull the external network ID from dependencyVars
+	networkVars, ok := dependencyVars[object.Router.ExternalNetwork]
+	if !ok {
+		return nil, fmt.Errorf("failed to get vars for external network %s", object.Router.ExternalNetwork)
 	}
-	allNetworks, err := networks.ExtractNetworks(allNetworkPages)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get router external network \"%s\": %v", object.Router.ExternalNetwork, err)
-	}
-	for _, net := range allNetworks {
-		if net.Name == object.Router.ExternalNetwork || net.ID == object.Router.ExternalNetwork {
-			routerExternalNetwork = &net
-			break
-		}
-	}
-	if routerExternalNetwork == nil {
-		return nil, fmt.Errorf("failed to get router external network \"%s\": network not found", object.Router.ExternalNetwork)
+	externalNetworkId, exists := networkVars.Vars["id"]
+	if !exists {
+		return nil, fmt.Errorf("ID unknown for network \"%s\"", object.Router.ExternalNetwork)
 	}
 
 	// Prepend the first 8 bytes of deployment ID
@@ -371,7 +369,7 @@ func (provider *ProviderOpenstack) deployRouter(ctx context.Context, authClient 
 		Description:  "",
 		AdminStateUp: gophercloud.Enabled,
 		GatewayInfo: &routers.GatewayInfo{
-			NetworkID: routerExternalNetwork.ID,
+			NetworkID: externalNetworkId,
 		},
 	}
 	if object.Router.Name != nil {

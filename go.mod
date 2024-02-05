@@ -6,7 +6,7 @@ require (
 	github.com/cble-platform/cble-backend v0.1.4-0.20240201204425-a85153804ddf
 	github.com/cble-platform/cble-provider-grpc v0.1.4-0.20240201213927-c3166704adbf
 	github.com/google/uuid v1.6.0
-	github.com/gophercloud/gophercloud v1.7.0
+	github.com/gophercloud/gophercloud v1.9.0
 	github.com/sirupsen/logrus v1.9.3
 	gopkg.in/yaml.v3 v3.0.1
 )

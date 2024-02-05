@@ -47,10 +47,18 @@ func (provider ProviderOpenstack) DestroyResource(ctx context.Context, request *
 		}, nil
 	}
 
+	// Check this is a resource (not data)
+	if object.Resource == nil {
+		return &providerGRPC.DestroyResourceReply{
+			Success: false,
+			Errors:  Errorf("cannot destroy data object"),
+		}, nil
+	}
+
 	var updatedVars map[string]string
 
 	// Destroy the resource based on the type of resource
-	switch object.Resource {
+	switch *object.Resource {
 	// HOST
 	case OpenstackResourceTypeHost:
 		// Destroy host

@@ -31,10 +31,11 @@ type OpenstackObject struct {
 	// Inherit standard object values
 	models.Object `yaml:",inline"`
 	// Openstack specific values
-	Resource OpenstackResourceType `yaml:"-"`
-	Host     *OpenstackHost        `yaml:"-"`
-	Network  *OpenstackNetwork     `yaml:"-"`
-	Router   *OpenstackRouter      `yaml:"-"`
+	Data     *OpenstackResourceType `yaml:"-"`
+	Resource *OpenstackResourceType `yaml:"-"`
+	Host     *OpenstackHost         `yaml:"-"`
+	Network  *OpenstackNetwork      `yaml:"-"`
+	Router   *OpenstackRouter       `yaml:"-"`
 }
 
 func (o *OpenstackObject) UnmarshalYAML(n *yaml.Node) error {
@@ -49,10 +50,17 @@ func (o *OpenstackObject) UnmarshalYAML(n *yaml.Node) error {
 	}
 
 	// Convert resource string into openstack resource type
-	o.Resource = OpenstackResourceType(o.Object.Resource)
+	var t OpenstackResourceType
+	if o.Object.Resource != nil {
+		t = OpenstackResourceType(*o.Object.Resource)
+		o.Resource = &t
+	} else if o.Object.Data != nil {
+		t = OpenstackResourceType(*o.Object.Data)
+		o.Data = &t
+	}
 
 	// Marshall the various resource types
-	switch o.Resource {
+	switch t {
 	case OpenstackResourceTypeHost:
 		o.Host = new(OpenstackHost)
 		return obj.Config.Decode(o.Host)
@@ -63,25 +71,27 @@ func (o *OpenstackObject) UnmarshalYAML(n *yaml.Node) error {
 		o.Router = new(OpenstackRouter)
 		return obj.Config.Decode(o.Router)
 	default:
-		return fmt.Errorf("unknown resource type \"%s\"", o.Resource)
+		return fmt.Errorf("unknown resource type \"%s\"", t)
 	}
 }
 
 type OpenstackHost struct {
+	// Openstack instance id
+	ID *string `yaml:"id,omitempty"`
 	// Openstack instance name
 	Name *string `yaml:"name,omitempty"`
 	// Openstack instance description
 	Description *string `yaml:"description,omitempty"`
 	// Hostname of the host
-	Hostname string `yaml:"hostname"`
+	Hostname string `yaml:"hostname,omitempty"`
 	// Image of the host
-	Image string `yaml:"image"`
+	Image string `yaml:"image,omitempty"`
 	// Flavor of the host
-	Flavor string `yaml:"flavor"`
+	Flavor string `yaml:"flavor,omitempty"`
 	// Disk size of the host (in GB)
-	DiskSize int `yaml:"disk_size"`
+	DiskSize int `yaml:"disk_size,omitempty"`
 	// Networks to attach this host to
-	Networks map[string]OpenstackNetworkAttachment `yaml:"networks"`
+	Networks map[string]OpenstackNetworkAttachment `yaml:"networks,omitempty"`
 	// Any userdata to pass to created instance
 	UserData []byte `yaml:"user_data,omitempty"`
 }
@@ -94,6 +104,8 @@ type OpenstackNetworkAttachment struct {
 }
 
 type OpenstackNetwork struct {
+	// Openstack network id
+	ID *string `yaml:"id,omitempty"`
 	// Openstack network name
 	Name *string `yaml:"name,omitempty"`
 	// Openstack network description
@@ -116,6 +128,8 @@ type OpenstackNetworkDHCP struct {
 }
 
 type OpenstackRouter struct {
+	// Openstack router id
+	ID *string `yaml:"id,omitempty"`
 	// Openstack router name
 	Name *string `yaml:"name,omitempty"`
 	// Openstack router description
