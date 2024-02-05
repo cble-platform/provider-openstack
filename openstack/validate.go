@@ -4,8 +4,18 @@ import "fmt"
 
 func ValidateBlueprint(blueprint *OpenstackBlueprint) error {
 	for k, o := range blueprint.Objects {
+		// Check the object type
+		var t *OpenstackResourceType
+		if o.Resource != nil {
+			t = o.Resource
+		} else if o.Data != nil {
+			t = o.Data
+		} else {
+			return fmt.Errorf("resource or data required")
+		}
+
 		// Validate individual dependent types
-		switch o.Resource {
+		switch *t {
 		case OpenstackResourceTypeHost:
 			if err := validateHost(blueprint, k); err != nil {
 				return fmt.Errorf("invalid host \"%s\": %v", k, err)
