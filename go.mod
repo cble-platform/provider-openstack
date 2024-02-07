@@ -3,7 +3,7 @@ module github.com/cble-platform/provider-openstack
 go 1.21
 
 require (
-	github.com/cble-platform/cble-backend v0.1.4-0.20240201204425-a85153804ddf
+	github.com/cble-platform/cble-backend v0.1.4-0.20240205223524-7c9c40d8a001
 	github.com/cble-platform/cble-provider-grpc v0.1.4-0.20240205223529-88c2d25cbb55
 	github.com/google/uuid v1.6.0
 	github.com/gophercloud/gophercloud v1.9.0
