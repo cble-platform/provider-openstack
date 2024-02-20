@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	providerGRPC "github.com/cble-platform/cble-provider-grpc/pkg/provider"
+	pgrpc "github.com/cble-platform/cble-provider-grpc/pkg/provider"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/remoteconsoles"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
@@ -31,12 +31,12 @@ func ConfigFromBytes(in []byte) (*ProviderOpenstackConfig, error) {
 	return &config, nil
 }
 
-func (provider ProviderOpenstack) Configure(ctx context.Context, request *providerGRPC.ConfigureRequest) (*providerGRPC.ConfigureReply, error) {
+func (provider ProviderOpenstack) Configure(ctx context.Context, request *pgrpc.ConfigureRequest) (*pgrpc.ConfigureReply, error) {
 	logrus.Debugf("----- Configure called with %d byte config -----", len(request.Config))
 
 	config, err := ConfigFromBytes(request.Config)
 	if err != nil {
-		return &providerGRPC.ConfigureReply{
+		return &pgrpc.ConfigureReply{
 			Success: false,
 		}, fmt.Errorf("failed to read config: %v", err)
 	}
@@ -46,12 +46,12 @@ func (provider ProviderOpenstack) Configure(ctx context.Context, request *provid
 
 	// Test the connection
 	if _, err := provider.newAuthClient(); err != nil {
-		return &providerGRPC.ConfigureReply{
+		return &pgrpc.ConfigureReply{
 			Success: false,
 		}, fmt.Errorf("connection test failed: %v", err)
 	}
 
-	return &providerGRPC.ConfigureReply{
+	return &pgrpc.ConfigureReply{
 		Success: true,
 	}, nil
 }

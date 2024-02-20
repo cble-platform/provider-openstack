@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"regexp"
 
-	providerGRPC "github.com/cble-platform/cble-provider-grpc/pkg/provider"
+	pgrpc "github.com/cble-platform/cble-provider-grpc/pkg/provider"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
@@ -17,23 +17,23 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func (provider ProviderOpenstack) RetrieveData(ctx context.Context, request *providerGRPC.RetrieveDataRequest) (*providerGRPC.RetrieveDataReply, error) {
+func (provider ProviderOpenstack) RetrieveData(ctx context.Context, request *pgrpc.RetrieveDataRequest) (*pgrpc.RetrieveDataReply, error) {
 	logrus.Debugf("----- RetrieveData called for deployment (%s) resource %s -----", request.Deployment.Id, request.Resource.Key)
 
 	// Check if the provider has been configured
 	if CONFIG == nil {
-		return &providerGRPC.RetrieveDataReply{
+		return &pgrpc.RetrieveDataReply{
 			Success: false,
-			Errors:  Errorf("cannot deploy with unconfigured provider, please call Configure()"),
+			Error:   Errorf("cannot deploy with unconfigured provider, please call Configure()"),
 		}, nil
 	}
 
 	// Generate authenticated client session
 	authClient, err := provider.newAuthClient()
 	if err != nil {
-		return &providerGRPC.RetrieveDataReply{
+		return &pgrpc.RetrieveDataReply{
 			Success: false,
-			Errors:  Errorf("failed to authenticate: %v", err),
+			Error:   Errorf("failed to authenticate: %v", err),
 		}, nil
 	}
 
@@ -41,17 +41,17 @@ func (provider ProviderOpenstack) RetrieveData(ctx context.Context, request *pro
 	var object *OpenstackObject
 	err = yaml.Unmarshal(request.Resource.Object, &object)
 	if err != nil {
-		return &providerGRPC.RetrieveDataReply{
+		return &pgrpc.RetrieveDataReply{
 			Success: false,
-			Errors:  Errorf("failed to unmarshal resource object: %v", err),
+			Error:   Errorf("failed to unmarshal resource object: %v", err),
 		}, nil
 	}
 
 	// Check this is a data (not resource)
 	if object.Data == nil {
-		return &providerGRPC.RetrieveDataReply{
+		return &pgrpc.RetrieveDataReply{
 			Success: false,
-			Errors:  Errorf("cannot retrieve data for resource object"),
+			Error:   Errorf("cannot retrieve data for resource object"),
 		}, nil
 	}
 
@@ -63,40 +63,40 @@ func (provider ProviderOpenstack) RetrieveData(ctx context.Context, request *pro
 	case OpenstackResourceTypeHost:
 		// Deploy host
 		if updatedVars, err = provider.retrieveHostData(ctx, authClient, request, object, request.Vars, request.DependencyVars); err != nil {
-			return &providerGRPC.RetrieveDataReply{
+			return &pgrpc.RetrieveDataReply{
 				Success: false,
-				Errors:  Errorf("failed to retrieve host data: %v", err),
+				Error:   Errorf("failed to retrieve host data: %v", err),
 			}, nil
 		}
 	// NETWORK
 	case OpenstackResourceTypeNetwork:
 		// Deploy network
 		if updatedVars, err = provider.retrieveNetworkData(ctx, authClient, request, object, request.Vars, request.DependencyVars); err != nil {
-			return &providerGRPC.RetrieveDataReply{
+			return &pgrpc.RetrieveDataReply{
 				Success: false,
-				Errors:  Errorf("failed to retrieve network data: %v", err),
+				Error:   Errorf("failed to retrieve network data: %v", err),
 			}, nil
 		}
 	// ROUTER
 	case OpenstackResourceTypeRouter:
 		// Deploy router
 		if updatedVars, err = provider.retrieveRouterData(ctx, authClient, request, object, request.Vars, request.DependencyVars); err != nil {
-			return &providerGRPC.RetrieveDataReply{
+			return &pgrpc.RetrieveDataReply{
 				Success: false,
-				Errors:  Errorf("failed to retrieve router data: %v", err),
+				Error:   Errorf("failed to retrieve router data: %v", err),
 			}, nil
 		}
 	}
 
 	// Return the updated vars
-	return &providerGRPC.RetrieveDataReply{
+	return &pgrpc.RetrieveDataReply{
 		Success:     true,
-		Errors:      nil,
+		Error:       nil,
 		UpdatedVars: updatedVars,
 	}, nil
 }
 
-func (provider *ProviderOpenstack) retrieveHostData(ctx context.Context, authClient *gophercloud.ProviderClient, request *providerGRPC.RetrieveDataRequest, object *OpenstackObject, vars map[string]string, dependencyVars map[string]*providerGRPC.DependencyVars) (map[string]string, error) {
+func (provider *ProviderOpenstack) retrieveHostData(ctx context.Context, authClient *gophercloud.ProviderClient, request *pgrpc.RetrieveDataRequest, object *OpenstackObject, vars map[string]string, dependencyVars map[string]*pgrpc.DependencyVars) (map[string]string, error) {
 	logrus.Debugf("Retrieving host data \"%s\"", request.Resource.Key)
 
 	// Initialize updated vars to old vars
@@ -173,7 +173,7 @@ func (provider *ProviderOpenstack) retrieveHostData(ctx context.Context, authCli
 	return updatedVars, nil
 }
 
-func (provider *ProviderOpenstack) retrieveNetworkData(ctx context.Context, authClient *gophercloud.ProviderClient, request *providerGRPC.RetrieveDataRequest, object *OpenstackObject, vars map[string]string, dependencyVars map[string]*providerGRPC.DependencyVars) (map[string]string, error) {
+func (provider *ProviderOpenstack) retrieveNetworkData(ctx context.Context, authClient *gophercloud.ProviderClient, request *pgrpc.RetrieveDataRequest, object *OpenstackObject, vars map[string]string, dependencyVars map[string]*pgrpc.DependencyVars) (map[string]string, error) {
 	logrus.Debugf("Retrieving network data \"%s\"", request.Resource.Key)
 
 	// Initialize updated vars to old vars
@@ -257,7 +257,7 @@ func (provider *ProviderOpenstack) retrieveNetworkData(ctx context.Context, auth
 	return updatedVars, nil
 }
 
-func (provider *ProviderOpenstack) retrieveRouterData(ctx context.Context, authClient *gophercloud.ProviderClient, request *providerGRPC.RetrieveDataRequest, object *OpenstackObject, vars map[string]string, dependencyVars map[string]*providerGRPC.DependencyVars) (map[string]string, error) {
+func (provider *ProviderOpenstack) retrieveRouterData(ctx context.Context, authClient *gophercloud.ProviderClient, request *pgrpc.RetrieveDataRequest, object *OpenstackObject, vars map[string]string, dependencyVars map[string]*pgrpc.DependencyVars) (map[string]string, error) {
 	logrus.Debugf("Retrieving router data \"%s\"", request.Resource.Key)
 
 	// Initialize updated vars to old vars

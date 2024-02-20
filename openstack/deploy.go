@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	providerGRPC "github.com/cble-platform/cble-provider-grpc/pkg/provider"
+	pgrpc "github.com/cble-platform/cble-provider-grpc/pkg/provider"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/bootfromvolume"
@@ -20,23 +20,23 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func (provider ProviderOpenstack) DeployResource(ctx context.Context, request *providerGRPC.DeployResourceRequest) (*providerGRPC.DeployResourceReply, error) {
+func (provider ProviderOpenstack) DeployResource(ctx context.Context, request *pgrpc.DeployResourceRequest) (*pgrpc.DeployResourceReply, error) {
 	logrus.Debugf("----- DeployResource called for deployment (%s) resource %s -----", request.Deployment.Id, request.Resource.Key)
 
 	// Check if the provider has been configured
 	if CONFIG == nil {
-		return &providerGRPC.DeployResourceReply{
+		return &pgrpc.DeployResourceReply{
 			Success: false,
-			Errors:  Errorf("cannot deploy with unconfigured provider, please call Configure()"),
+			Error:   Errorf("cannot deploy with unconfigured provider, please call Configure()"),
 		}, nil
 	}
 
 	// Generate authenticated client session
 	authClient, err := provider.newAuthClient()
 	if err != nil {
-		return &providerGRPC.DeployResourceReply{
+		return &pgrpc.DeployResourceReply{
 			Success: false,
-			Errors:  Errorf("failed to authenticate: %v", err),
+			Error:   Errorf("failed to authenticate: %v", err),
 		}, nil
 	}
 
@@ -44,17 +44,17 @@ func (provider ProviderOpenstack) DeployResource(ctx context.Context, request *p
 	var object *OpenstackObject
 	err = yaml.Unmarshal(request.Resource.Object, &object)
 	if err != nil {
-		return &providerGRPC.DeployResourceReply{
+		return &pgrpc.DeployResourceReply{
 			Success: false,
-			Errors:  Errorf("failed to unmarshal resource object: %v", err),
+			Error:   Errorf("failed to unmarshal resource object: %v", err),
 		}, nil
 	}
 
 	// Check this is a resource (not data)
 	if object.Resource == nil {
-		return &providerGRPC.DeployResourceReply{
+		return &pgrpc.DeployResourceReply{
 			Success: false,
-			Errors:  Errorf("cannot deploy data object"),
+			Error:   Errorf("cannot deploy data object"),
 		}, nil
 	}
 
@@ -66,40 +66,40 @@ func (provider ProviderOpenstack) DeployResource(ctx context.Context, request *p
 	case OpenstackResourceTypeHost:
 		// Deploy host
 		if updatedVars, err = provider.deployHost(ctx, authClient, request, object, request.Vars, request.DependencyVars); err != nil {
-			return &providerGRPC.DeployResourceReply{
+			return &pgrpc.DeployResourceReply{
 				Success: false,
-				Errors:  Errorf("failed to deploy host: %v", err),
+				Error:   Errorf("failed to deploy host: %v", err),
 			}, nil
 		}
 	// NETWORK
 	case OpenstackResourceTypeNetwork:
 		// Deploy network
 		if updatedVars, err = provider.deployNetwork(ctx, authClient, request, object, request.Vars, request.DependencyVars); err != nil {
-			return &providerGRPC.DeployResourceReply{
+			return &pgrpc.DeployResourceReply{
 				Success: false,
-				Errors:  Errorf("failed to deploy network: %v", err),
+				Error:   Errorf("failed to deploy network: %v", err),
 			}, nil
 		}
 	// ROUTER
 	case OpenstackResourceTypeRouter:
 		// Deploy router
 		if updatedVars, err = provider.deployRouter(ctx, authClient, request, object, request.Vars, request.DependencyVars); err != nil {
-			return &providerGRPC.DeployResourceReply{
+			return &pgrpc.DeployResourceReply{
 				Success: false,
-				Errors:  Errorf("failed to deploy router: %v", err),
+				Error:   Errorf("failed to deploy router: %v", err),
 			}, nil
 		}
 	}
 
 	// Return the updated vars
-	return &providerGRPC.DeployResourceReply{
+	return &pgrpc.DeployResourceReply{
 		Success:     true,
-		Errors:      nil,
+		Error:       nil,
 		UpdatedVars: updatedVars,
 	}, nil
 }
 
-func (provider *ProviderOpenstack) deployHost(ctx context.Context, authClient *gophercloud.ProviderClient, request *providerGRPC.DeployResourceRequest, object *OpenstackObject, vars map[string]string, dependencyVars map[string]*providerGRPC.DependencyVars) (map[string]string, error) {
+func (provider *ProviderOpenstack) deployHost(ctx context.Context, authClient *gophercloud.ProviderClient, request *pgrpc.DeployResourceRequest, object *OpenstackObject, vars map[string]string, dependencyVars map[string]*pgrpc.DependencyVars) (map[string]string, error) {
 	logrus.Debugf("Deploying host \"%s\"", request.Resource.Key)
 
 	// Initialize updated vars to old vars
@@ -252,7 +252,7 @@ func (provider *ProviderOpenstack) deployHost(ctx context.Context, authClient *g
 	return updatedVars, nil
 }
 
-func (provider *ProviderOpenstack) deployNetwork(ctx context.Context, authClient *gophercloud.ProviderClient, request *providerGRPC.DeployResourceRequest, object *OpenstackObject, vars map[string]string, dependencyVars map[string]*providerGRPC.DependencyVars) (map[string]string, error) {
+func (provider *ProviderOpenstack) deployNetwork(ctx context.Context, authClient *gophercloud.ProviderClient, request *pgrpc.DeployResourceRequest, object *OpenstackObject, vars map[string]string, dependencyVars map[string]*pgrpc.DependencyVars) (map[string]string, error) {
 	logrus.Debugf("Deploying network \"%s\"", request.Resource.Key)
 
 	// Initialize updated vars to old vars
@@ -332,7 +332,7 @@ func (provider *ProviderOpenstack) deployNetwork(ctx context.Context, authClient
 	return updatedVars, nil
 }
 
-func (provider *ProviderOpenstack) deployRouter(ctx context.Context, authClient *gophercloud.ProviderClient, request *providerGRPC.DeployResourceRequest, object *OpenstackObject, vars map[string]string, dependencyVars map[string]*providerGRPC.DependencyVars) (map[string]string, error) {
+func (provider *ProviderOpenstack) deployRouter(ctx context.Context, authClient *gophercloud.ProviderClient, request *pgrpc.DeployResourceRequest, object *OpenstackObject, vars map[string]string, dependencyVars map[string]*pgrpc.DependencyVars) (map[string]string, error) {
 	logrus.Debugf("Deploying router \"%s\"", request.Resource.Key)
 
 	// Initialize updated vars to old vars

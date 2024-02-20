@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	providerGRPC "github.com/cble-platform/cble-provider-grpc/pkg/provider"
+	pgrpc "github.com/cble-platform/cble-provider-grpc/pkg/provider"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/startstop"
@@ -13,23 +13,23 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func (provider ProviderOpenstack) ResourcePower(ctx context.Context, request *providerGRPC.ResourcePowerRequest) (*providerGRPC.ResourcePowerReply, error) {
+func (provider ProviderOpenstack) ResourcePower(ctx context.Context, request *pgrpc.ResourcePowerRequest) (*pgrpc.ResourcePowerReply, error) {
 	logrus.Debugf("----- ResourcePower called for resource \"%s\" -----", request.Resource.Id)
 
 	// Check if the provider has been configured
 	if CONFIG == nil {
-		return &providerGRPC.ResourcePowerReply{
+		return &pgrpc.ResourcePowerReply{
 			Success: false,
-			Errors:  Errorf("cannot destroy with unconfigured provider, please call Configure()"),
+			Error:   Errorf("cannot destroy with unconfigured provider, please call Configure()"),
 		}, nil
 	}
 
 	// Generate authenticated client session
 	authClient, err := provider.newAuthClient()
 	if err != nil {
-		return &providerGRPC.ResourcePowerReply{
+		return &pgrpc.ResourcePowerReply{
 			Success: false,
-			Errors:  Errorf("failed to authenticate: %v", err),
+			Error:   Errorf("failed to authenticate: %v", err),
 		}, nil
 	}
 
@@ -37,56 +37,56 @@ func (provider ProviderOpenstack) ResourcePower(ctx context.Context, request *pr
 	var object *OpenstackObject
 	err = yaml.Unmarshal(request.Resource.Object, &object)
 	if err != nil {
-		return &providerGRPC.ResourcePowerReply{
+		return &pgrpc.ResourcePowerReply{
 			Success: false,
-			Errors:  Errorf("failed to unmarshal resource object: %v", err),
+			Error:   Errorf("failed to unmarshal resource object: %v", err),
 		}, nil
 	}
 
 	// Check this is a resource (not data)
 	if object.Resource == nil {
-		return &providerGRPC.ResourcePowerReply{
+		return &pgrpc.ResourcePowerReply{
 			Success: false,
-			Errors:  Errorf("cannot destroy data object"),
+			Error:   Errorf("cannot destroy data object"),
 		}, nil
 	}
 
 	// Check the resource type (only allow power modifications to servers)
 	if *object.Resource != OpenstackResourceTypeHost {
-		return &providerGRPC.ResourcePowerReply{
+		return &pgrpc.ResourcePowerReply{
 			Success: false,
-			Errors:  Errorf("cannot modify power state for this resource"),
+			Error:   Errorf("cannot modify power state for this resource"),
 		}, nil
 	}
 
 	switch request.State {
-	case providerGRPC.PowerState_ON:
+	case pgrpc.PowerState_ON:
 		err = provider.powerOnResource(ctx, authClient, request, object)
-	case providerGRPC.PowerState_OFF:
+	case pgrpc.PowerState_OFF:
 		err = provider.powerOffResource(ctx, authClient, request, object)
-	case providerGRPC.PowerState_RESET:
+	case pgrpc.PowerState_RESET:
 		err = provider.resetResource(ctx, authClient, request, object)
 	default:
-		return &providerGRPC.ResourcePowerReply{
+		return &pgrpc.ResourcePowerReply{
 			Success: false,
-			Errors:  Errorf("power state \"%s\" is unknown", request.State),
+			Error:   Errorf("power state \"%s\" is unknown", request.State),
 		}, nil
 	}
 
 	if err != nil {
-		return &providerGRPC.ResourcePowerReply{
+		return &pgrpc.ResourcePowerReply{
 			Success: false,
-			Errors:  Errorf(err.Error()),
+			Error:   Errorf(err.Error()),
 		}, nil
 	}
 
-	return &providerGRPC.ResourcePowerReply{
+	return &pgrpc.ResourcePowerReply{
 		Success: true,
-		Errors:  nil,
+		Error:   nil,
 	}, nil
 }
 
-func (provider ProviderOpenstack) powerOnResource(ctx context.Context, authClient *gophercloud.ProviderClient, request *providerGRPC.ResourcePowerRequest, object *OpenstackObject) error {
+func (provider ProviderOpenstack) powerOnResource(ctx context.Context, authClient *gophercloud.ProviderClient, request *pgrpc.ResourcePowerRequest, object *OpenstackObject) error {
 	logrus.Debugf("Powering on host \"%s\"", request.Resource.Id)
 
 	// Generate the Compute V2 client
@@ -112,7 +112,7 @@ func (provider ProviderOpenstack) powerOnResource(ctx context.Context, authClien
 	return nil
 }
 
-func (provider ProviderOpenstack) powerOffResource(ctx context.Context, authClient *gophercloud.ProviderClient, request *providerGRPC.ResourcePowerRequest, object *OpenstackObject) error {
+func (provider ProviderOpenstack) powerOffResource(ctx context.Context, authClient *gophercloud.ProviderClient, request *pgrpc.ResourcePowerRequest, object *OpenstackObject) error {
 	logrus.Debugf("Powering off host \"%s\"", request.Resource.Id)
 
 	// Generate the Compute V2 client
@@ -138,7 +138,7 @@ func (provider ProviderOpenstack) powerOffResource(ctx context.Context, authClie
 	return nil
 }
 
-func (provider ProviderOpenstack) resetResource(ctx context.Context, authClient *gophercloud.ProviderClient, request *providerGRPC.ResourcePowerRequest, object *OpenstackObject) error {
+func (provider ProviderOpenstack) resetResource(ctx context.Context, authClient *gophercloud.ProviderClient, request *pgrpc.ResourcePowerRequest, object *OpenstackObject) error {
 	logrus.Debugf("Resetting host \"%s\"", request.Resource.Id)
 
 	// Generate the Compute V2 client

@@ -1,6 +1,6 @@
 package openstack
 
-// func (provider ProviderOpenstack) GetResourceList(ctx context.Context, request *providerGRPC.GetResourceListRequest) (*providerGRPC.GetResourceListReply, error) {
+// func (provider ProviderOpenstack) GetResourceList(ctx context.Context, request *pgrpc.GetResourceListRequest) (*pgrpc.GetResourceListReply, error) {
 // 	logrus.Debugf("GetResourceList called for deployment \"%s\"", request.DeploymentId)
 
 // 	// Parse blueprint into struct
@@ -15,10 +15,10 @@ package openstack
 // 		return nil, fmt.Errorf("blueprint is invalid: %v", err)
 // 	}
 
-// 	response := &providerGRPC.GetResourceListReply{
+// 	response := &pgrpc.GetResourceListReply{
 // 		Status:       common.RPCStatus_SUCCESS,
 // 		DeploymentId: request.DeploymentId,
-// 		Resources:    []*providerGRPC.Resource{},
+// 		Resources:    []*pgrpc.Resource{},
 // 	}
 
 // 	for key := range blueprint.Objects {
@@ -29,11 +29,11 @@ package openstack
 // 			if blueprint.Hosts[key].Name != nil {
 // 				name = *blueprint.Hosts[key].Name
 // 			}
-// 			response.Resources = append(response.Resources, &providerGRPC.Resource{
+// 			response.Resources = append(response.Resources, &pgrpc.Resource{
 // 				Key:          key,
 // 				DeploymentId: request.DeploymentId,
 // 				Name:         name,
-// 				Type:         providerGRPC.ResourceType_HOST,
+// 				Type:         pgrpc.ResourceType_HOST,
 // 			})
 // 		// NETWORK
 // 		case OpenstackResourceTypeNetwork:
@@ -41,11 +41,11 @@ package openstack
 // 			if blueprint.Networks[key].Name != nil {
 // 				name = *blueprint.Networks[key].Name
 // 			}
-// 			response.Resources = append(response.Resources, &providerGRPC.Resource{
+// 			response.Resources = append(response.Resources, &pgrpc.Resource{
 // 				Key:          key,
 // 				DeploymentId: request.DeploymentId,
 // 				Name:         name,
-// 				Type:         providerGRPC.ResourceType_NETWORK,
+// 				Type:         pgrpc.ResourceType_NETWORK,
 // 			})
 // 		// ROUTER
 // 		case OpenstackResourceTypeRouter:
@@ -53,18 +53,18 @@ package openstack
 // 			if blueprint.Routers[key].Name != nil {
 // 				name = *blueprint.Routers[key].Name
 // 			}
-// 			response.Resources = append(response.Resources, &providerGRPC.Resource{
+// 			response.Resources = append(response.Resources, &pgrpc.Resource{
 // 				Key:          key,
 // 				DeploymentId: request.DeploymentId,
 // 				Name:         name,
-// 				Type:         providerGRPC.ResourceType_ROUTER,
+// 				Type:         pgrpc.ResourceType_ROUTER,
 // 			})
 // 		default:
-// 			response.Resources = append(response.Resources, &providerGRPC.Resource{
+// 			response.Resources = append(response.Resources, &pgrpc.Resource{
 // 				Key:          key,
 // 				DeploymentId: request.DeploymentId,
 // 				Name:         key,
-// 				Type:         providerGRPC.ResourceType_UNKNOWN,
+// 				Type:         pgrpc.ResourceType_UNKNOWN,
 // 			})
 // 		}
 // 	}

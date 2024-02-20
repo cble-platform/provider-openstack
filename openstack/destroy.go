@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	providerGRPC "github.com/cble-platform/cble-provider-grpc/pkg/provider"
+	pgrpc "github.com/cble-platform/cble-provider-grpc/pkg/provider"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/baremetal/v1/ports"
@@ -17,23 +17,23 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func (provider ProviderOpenstack) DestroyResource(ctx context.Context, request *providerGRPC.DestroyResourceRequest) (*providerGRPC.DestroyResourceReply, error) {
+func (provider ProviderOpenstack) DestroyResource(ctx context.Context, request *pgrpc.DestroyResourceRequest) (*pgrpc.DestroyResourceReply, error) {
 	logrus.Debugf("----- DestroyResource called for deployment (%s) resource %s -----", request.Deployment.Id, request.Resource.Key)
 
 	// Check if the provider has been configured
 	if CONFIG == nil {
-		return &providerGRPC.DestroyResourceReply{
+		return &pgrpc.DestroyResourceReply{
 			Success: false,
-			Errors:  Errorf("cannot destroy with unconfigured provider, please call Configure()"),
+			Error:   Errorf("cannot destroy with unconfigured provider, please call Configure()"),
 		}, nil
 	}
 
 	// Generate authenticated client session
 	authClient, err := provider.newAuthClient()
 	if err != nil {
-		return &providerGRPC.DestroyResourceReply{
+		return &pgrpc.DestroyResourceReply{
 			Success: false,
-			Errors:  Errorf("failed to authenticate: %v", err),
+			Error:   Errorf("failed to authenticate: %v", err),
 		}, nil
 	}
 
@@ -41,17 +41,17 @@ func (provider ProviderOpenstack) DestroyResource(ctx context.Context, request *
 	var object *OpenstackObject
 	err = yaml.Unmarshal(request.Resource.Object, &object)
 	if err != nil {
-		return &providerGRPC.DestroyResourceReply{
+		return &pgrpc.DestroyResourceReply{
 			Success: false,
-			Errors:  Errorf("failed to unmarshal resource object: %v", err),
+			Error:   Errorf("failed to unmarshal resource object: %v", err),
 		}, nil
 	}
 
 	// Check this is a resource (not data)
 	if object.Resource == nil {
-		return &providerGRPC.DestroyResourceReply{
+		return &pgrpc.DestroyResourceReply{
 			Success: false,
-			Errors:  Errorf("cannot destroy data object"),
+			Error:   Errorf("cannot destroy data object"),
 		}, nil
 	}
 
@@ -63,40 +63,40 @@ func (provider ProviderOpenstack) DestroyResource(ctx context.Context, request *
 	case OpenstackResourceTypeHost:
 		// Destroy host
 		if updatedVars, err = provider.destroyHost(ctx, authClient, request, object, request.Vars); err != nil {
-			return &providerGRPC.DestroyResourceReply{
+			return &pgrpc.DestroyResourceReply{
 				Success: false,
-				Errors:  Errorf("failed to destroy host: %v", err),
+				Error:   Errorf("failed to destroy host: %v", err),
 			}, nil
 		}
 	// NETWORK
 	case OpenstackResourceTypeNetwork:
 		// Destroy network
 		if updatedVars, err = provider.destroyNetwork(ctx, authClient, request, object, request.Vars); err != nil {
-			return &providerGRPC.DestroyResourceReply{
+			return &pgrpc.DestroyResourceReply{
 				Success: false,
-				Errors:  Errorf("failed to destroy network: %v", err),
+				Error:   Errorf("failed to destroy network: %v", err),
 			}, nil
 		}
 	// ROUTER
 	case OpenstackResourceTypeRouter:
 		// Destroy router
 		if updatedVars, err = provider.destroyRouter(ctx, authClient, request, object, request.Vars); err != nil {
-			return &providerGRPC.DestroyResourceReply{
+			return &pgrpc.DestroyResourceReply{
 				Success: false,
-				Errors:  Errorf("failed to destroy router: %v", err),
+				Error:   Errorf("failed to destroy router: %v", err),
 			}, nil
 		}
 	}
 
 	// Return the updated vars
-	return &providerGRPC.DestroyResourceReply{
+	return &pgrpc.DestroyResourceReply{
 		Success:     true,
-		Errors:      nil,
+		Error:       nil,
 		UpdatedVars: updatedVars,
 	}, nil
 }
 
-func (provider *ProviderOpenstack) destroyHost(ctx context.Context, authClient *gophercloud.ProviderClient, request *providerGRPC.DestroyResourceRequest, object *OpenstackObject, vars map[string]string) (map[string]string, error) {
+func (provider *ProviderOpenstack) destroyHost(ctx context.Context, authClient *gophercloud.ProviderClient, request *pgrpc.DestroyResourceRequest, object *OpenstackObject, vars map[string]string) (map[string]string, error) {
 	logrus.Debugf("Destroying host \"%s\"", request.Resource.Key)
 
 	// Initialize updated vars to old vars
@@ -143,7 +143,7 @@ func (provider *ProviderOpenstack) destroyHost(ctx context.Context, authClient *
 	return updatedVars, nil
 }
 
-func (provider *ProviderOpenstack) destroyNetwork(ctx context.Context, authClient *gophercloud.ProviderClient, request *providerGRPC.DestroyResourceRequest, object *OpenstackObject, vars map[string]string) (map[string]string, error) {
+func (provider *ProviderOpenstack) destroyNetwork(ctx context.Context, authClient *gophercloud.ProviderClient, request *pgrpc.DestroyResourceRequest, object *OpenstackObject, vars map[string]string) (map[string]string, error) {
 	logrus.Debugf("Destroying network \"%s\"", request.Resource.Key)
 
 	// Initialize updated vars to old vars
@@ -217,7 +217,7 @@ func (provider *ProviderOpenstack) destroyNetwork(ctx context.Context, authClien
 	return updatedVars, nil
 }
 
-func (provider *ProviderOpenstack) destroyRouter(ctx context.Context, authClient *gophercloud.ProviderClient, request *providerGRPC.DestroyResourceRequest, object *OpenstackObject, vars map[string]string) (map[string]string, error) {
+func (provider *ProviderOpenstack) destroyRouter(ctx context.Context, authClient *gophercloud.ProviderClient, request *pgrpc.DestroyResourceRequest, object *OpenstackObject, vars map[string]string) (map[string]string, error) {
 	logrus.Debugf("Destroying router \"%s\"", request.Resource.Key)
 
 	// Initialize updated vars to old vars

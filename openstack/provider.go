@@ -1,11 +1,11 @@
 package openstack
 
 import (
-	providerGRPC "github.com/cble-platform/cble-provider-grpc/pkg/provider"
+	pgrpc "github.com/cble-platform/cble-provider-grpc/pkg/provider"
 )
 
 type ProviderOpenstack struct {
-	providerGRPC.DefaultProviderServer
+	pgrpc.DefaultProviderServer
 }
 
 const (
