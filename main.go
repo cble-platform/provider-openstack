@@ -5,7 +5,7 @@ import (
 	"os"
 
 	cbleGRPC "github.com/cble-platform/cble-provider-grpc/pkg/cble"
-	providerGRPC "github.com/cble-platform/cble-provider-grpc/pkg/provider"
+	pgrpc "github.com/cble-platform/cble-provider-grpc/pkg/provider"
 	"github.com/cble-platform/provider-openstack/openstack"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
@@ -80,7 +80,7 @@ func main() {
 		}
 	}()
 
-	providerOpts := &providerGRPC.ProviderServerOptions{
+	providerOpts := &pgrpc.ProviderServerOptions{
 		TLS:      false,
 		CertFile: "",
 		KeyFile:  "",
@@ -90,7 +90,7 @@ func main() {
 	logrus.Debugf("serving gRPC with socket ID %s", registerReply.SocketId)
 
 	// Serve the provider gRPC server
-	if err := providerGRPC.Serve(provider, providerOpts); err != nil {
+	if err := pgrpc.Serve(provider, providerOpts); err != nil {
 		logrus.Fatalf("failed to server provider gRPC server: %v", err)
 	}
 }

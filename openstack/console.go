@@ -1,17 +1,17 @@
 package openstack
 
-// func GetConsoleErrorf(request *providerGRPC.GetConsoleRequest, format string, a ...any) *providerGRPC.GetConsoleReply {
-// 	return &providerGRPC.GetConsoleReply{
+// func GetConsoleErrorf(request *pgrpc.GetConsoleRequest, format string, a ...any) *pgrpc.GetConsoleReply {
+// 	return &pgrpc.GetConsoleReply{
 // 		DeploymentId: request.DeploymentId,
 // 		Status:       commonGRPC.RPCStatus_FAILURE,
 // 		Console:      "",
-// 		Errors: []string{
+// 		Error: []string{
 // 			fmt.Sprintf(format, a...),
 // 		},
 // 	}
 // }
 
-// func (provider ProviderOpenstack) GetConsole(ctx context.Context, request *providerGRPC.GetConsoleRequest) (*providerGRPC.GetConsoleReply, error) {
+// func (provider ProviderOpenstack) GetConsole(ctx context.Context, request *pgrpc.GetConsoleRequest) (*pgrpc.GetConsoleReply, error) {
 // 	logrus.Debugf("GetConsole called for deployment \"%s\" host \"%s\"", request.DeploymentId, request.HostKey)
 
 // 	// Check if the provider has been configured
@@ -71,10 +71,10 @@ package openstack
 // 	}
 
 // 	// Return the URL
-// 	return &providerGRPC.GetConsoleReply{
+// 	return &pgrpc.GetConsoleReply{
 // 		DeploymentId: request.DeploymentId,
 // 		Status:       commonGRPC.RPCStatus_SUCCESS,
 // 		Console:      finalURL,
-// 		Errors:       []string{},
+// 		Error:       []string{},
 // 	}, nil
 // }
