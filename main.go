@@ -66,20 +66,6 @@ func main() {
 		logrus.Printf("Registration success! Starting provider server on socket /tmp/cble-provider-grpc-%s", registerReply.SocketId)
 	}
 
-	defer func() {
-		// Time to shutdown
-		unregisterReply, err := client.UnregisterProvider(ctx, &cbleGRPC.UnregistrationRequest{
-			Id:      id,
-			Name:    provider.Name(),
-			Version: provider.Version(),
-		})
-		if err != nil || !unregisterReply.Success {
-			logrus.Fatalf("unregistration failed: %v", err)
-		} else {
-			logrus.Print("Unregistration success! Shutting down...")
-		}
-	}()
-
 	providerOpts := &pgrpc.ProviderServerOptions{
 		TLS:      false,
 		CertFile: "",
@@ -89,8 +75,20 @@ func main() {
 
 	logrus.Debugf("serving gRPC with socket ID %s", registerReply.SocketId)
 
-	// Serve the provider gRPC server
+	// Serve the provider gRPC server (blocking call until Ctrl+C)
 	if err := pgrpc.Serve(provider, providerOpts); err != nil {
 		logrus.Fatalf("failed to server provider gRPC server: %v", err)
+	}
+
+	// Time to shutdown
+	unregisterReply, err := client.UnregisterProvider(ctx, &cbleGRPC.UnregistrationRequest{
+		Id:      id,
+		Name:    provider.Name(),
+		Version: provider.Version(),
+	})
+	if err != nil || !unregisterReply.Success {
+		logrus.Errorf("unregistration failed: %v", err)
+	} else {
+		logrus.Print("Unregistration success! Shutting down...")
 	}
 }

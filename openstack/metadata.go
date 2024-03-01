@@ -4,6 +4,9 @@ import (
 	"context"
 
 	pgrpc "github.com/cble-platform/cble-provider-grpc/pkg/provider"
+	"github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud/openstack"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
@@ -17,6 +20,26 @@ func extractResourceMetadataErrorReply(format string, a ...any) *pgrpc.ExtractRe
 
 func (provider ProviderOpenstack) ExtractResourceMetadata(ctx context.Context, request *pgrpc.ExtractResourceMetadataRequest) (*pgrpc.ExtractResourceMetadataReply, error) {
 	logrus.Debugf("----- ExtractResourceMetadata called with %d resources -----", len(request.Resources))
+
+	// Check if the provider has been configured
+	if CONFIG == nil {
+		return extractResourceMetadataErrorReply("cannot deploy with unconfigured provider, please call Configure()"), nil
+	}
+
+	// Generate authenticated client session
+	authClient, err := provider.newAuthClient()
+	if err != nil {
+		return extractResourceMetadataErrorReply("failed to authenticate: %v", err), nil
+	}
+
+	// Generate the Compute V2 client
+	endpointOpts := gophercloud.EndpointOpts{
+		Region: CONFIG.RegionName,
+	}
+	computeClient, err := openstack.NewComputeV2(authClient, endpointOpts)
+	if err != nil {
+		return extractResourceMetadataErrorReply("failed to create compute client: %v", err), nil
+	}
 
 	// Convert the resource list into a key:resource map
 	resourceMap := make(map[string]*pgrpc.Resource)
@@ -69,6 +92,33 @@ func (provider ProviderOpenstack) ExtractResourceMetadata(ctx context.Context, r
 					Power:   true,
 					Console: true,
 				}
+
+				// Get the server flavor to determine quota requirements
+				var hostFlavor *flavors.Flavor = nil
+				allFlavorPages, err := flavors.ListDetail(computeClient, nil).AllPages()
+				if err != nil {
+					return extractResourceMetadataErrorReply("failed to get host %s flavor \"%s\": %v", resource.Key, object.Host.Flavor, err), nil
+				}
+				allFlavors, err := flavors.ExtractFlavors(allFlavorPages)
+				if err != nil {
+					return extractResourceMetadataErrorReply("failed to get host %s flavor \"%s\": %v", resource.Key, object.Host.Flavor, err), nil
+				}
+				for _, fl := range allFlavors {
+					if fl.Name == object.Host.Flavor || fl.ID == object.Host.Flavor {
+						hostFlavor = &fl
+						break
+					}
+				}
+				if hostFlavor == nil {
+					return extractResourceMetadataErrorReply("failed to get host %s flavor \"%s\": flavor not found", resource.Key, object.Host.Flavor), nil
+				}
+
+				// Set the quota requirements
+				reply.Metadata[resource.Key].QuotaRequirements = &pgrpc.QuotaRequirements{
+					Cpu:  uint64(hostFlavor.VCPUs),
+					Ram:  uint64(hostFlavor.RAM),         // Already in MiB
+					Disk: uint64(hostFlavor.Disk) * 1024, // Convert GiB to MiB
+				}
 			// NETWORK
 			case OpenstackResourceTypeNetwork:
 				logrus.Debugf("Resource is type network")
@@ -77,6 +127,11 @@ func (provider ProviderOpenstack) ExtractResourceMetadata(ctx context.Context, r
 				reply.Metadata[resource.Key].Features = &pgrpc.Features{
 					Power:   false,
 					Console: false,
+				}
+
+				// Set the quota requirements
+				reply.Metadata[resource.Key].QuotaRequirements = &pgrpc.QuotaRequirements{
+					Network: 1,
 				}
 			// ROUTER
 			case OpenstackResourceTypeRouter:
@@ -103,6 +158,11 @@ func (provider ProviderOpenstack) ExtractResourceMetadata(ctx context.Context, r
 				reply.Metadata[resource.Key].Features = &pgrpc.Features{
 					Power:   false,
 					Console: false,
+				}
+
+				// Set the quota requirements
+				reply.Metadata[resource.Key].QuotaRequirements = &pgrpc.QuotaRequirements{
+					Router: 1,
 				}
 			}
 

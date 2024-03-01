@@ -12,7 +12,7 @@ const (
 	name        = "provider-openstack"
 	description = "Builder that interfaces with Openstack"
 	author      = "Bradley Harker <github.com/BradHacker>"
-	version     = "v0.1.2"
+	version     = "v1.0.0-alpha"
 )
 
 var CONFIG *ProviderOpenstackConfig
