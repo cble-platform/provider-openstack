@@ -1,0 +1,14 @@
+name: provider-openstack
+description: Builder that interfaces with Openstack
+author: Bradley Harker <github.com/BradHacker>
+version: v1.0.0-alpha
+
+type: docker # docker, shell
+
+docker:
+  dockerfile: Dockerfile
+  cmd: ./provider_openstack # the ID will be passed as the last positional argument
+# shell:
+#   prebuild_cmd: <commands to install proper go version>
+#   build_cmd: go build -o provider-openstack .
+#   exec_cmd: ./provider-openstack # the ID will be passed as the last positional argument
