@@ -1,4 +1,4 @@
-FROM golang:1.21-alpine
+FROM golang:1.22.2-alpine
 
 RUN mkdir /provider
 ADD . /provider/
