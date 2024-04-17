@@ -28,6 +28,8 @@ project_id: $OS_PROJECT_ID
 project_name: $OS_PROJECT_NAME
 domain_name: $OS_USER_DOMAIN_NAME
 domain_id: $OS_PROJECT_DOMAIN_ID
+console_type: novnc
+console_protocol: vnc
 EOF
 
 echo -e "\033[32mGenerated Openstack provider config $OUTPUT_FILE!\033[0m"

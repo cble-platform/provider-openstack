@@ -5,8 +5,7 @@ import (
 	"os"
 
 	cbleGRPC "github.com/cble-platform/cble-provider-grpc/pkg/cble"
-	commonGRPC "github.com/cble-platform/cble-provider-grpc/pkg/common"
-	providerGRPC "github.com/cble-platform/cble-provider-grpc/pkg/provider"
+	pgrpc "github.com/cble-platform/cble-provider-grpc/pkg/provider"
 	"github.com/cble-platform/provider-openstack/openstack"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
@@ -61,31 +60,13 @@ func main() {
 			Console: true,
 		},
 	})
-	if err != nil || registerReply.Status == commonGRPC.RPCStatus_FAILURE {
+	if err != nil || !registerReply.Success {
 		logrus.Fatalf("registration failed: %v", err)
-	} else if registerReply.Status == commonGRPC.RPCStatus_SUCCESS {
-		logrus.Printf("Registration success! Starting provider server on socket /tmp/cble-provider-grpc-%s", registerReply.SocketId)
 	} else {
-		logrus.Fatalf("unknown error occurred: %v", err)
+		logrus.Printf("Registration success! Starting provider server on socket /tmp/cble-provider-grpc-%s", registerReply.SocketId)
 	}
 
-	defer func() {
-		// Time to shutdown
-		unregisterReply, err := client.UnregisterProvider(ctx, &cbleGRPC.UnregistrationRequest{
-			Id:      id,
-			Name:    provider.Name(),
-			Version: provider.Version(),
-		})
-		if err != nil || unregisterReply.Status == commonGRPC.RPCStatus_FAILURE {
-			logrus.Fatalf("unregistration failed: %v", err)
-		} else if unregisterReply.Status == commonGRPC.RPCStatus_SUCCESS {
-			logrus.Print("Unregistration success! Shutting down...")
-		} else {
-			logrus.Fatalf("unknown error occurred: %v", err)
-		}
-	}()
-
-	providerOpts := &providerGRPC.ProviderServerOptions{
+	providerOpts := &pgrpc.ProviderServerOptions{
 		TLS:      false,
 		CertFile: "",
 		KeyFile:  "",
@@ -94,8 +75,20 @@ func main() {
 
 	logrus.Debugf("serving gRPC with socket ID %s", registerReply.SocketId)
 
-	// Serve the provider gRPC server
-	if err := providerGRPC.Serve(provider, providerOpts); err != nil {
+	// Serve the provider gRPC server (blocking call until Ctrl+C)
+	if err := pgrpc.Serve(provider, providerOpts); err != nil {
 		logrus.Fatalf("failed to server provider gRPC server: %v", err)
+	}
+
+	// Time to shutdown
+	unregisterReply, err := client.UnregisterProvider(ctx, &cbleGRPC.UnregistrationRequest{
+		Id:      id,
+		Name:    provider.Name(),
+		Version: provider.Version(),
+	})
+	if err != nil || !unregisterReply.Success {
+		logrus.Errorf("unregistration failed: %v", err)
+	} else {
+		logrus.Print("Unregistration success! Shutting down...")
 	}
 }
